@@ -6,7 +6,7 @@ import libstempo as T
 import libstempo.plot as LP, libstempo.toasim as LT
 import matplotlib.pyplot as plt
 
-T.data = '/home/wdp/src/pulsar_timing/' 
+T.data = '/projects/pulsar_timing/nested_sampling/python/PTparallel'
 
 def parse_to_list(option, opt, value, parser):
   setattr(parser.values, option.dest, value.split(','))
@@ -28,10 +28,10 @@ if __name__=="__main__":
 	psr2.savetim('pulsar_b_%d.simulate'%seed)
 	T.purgetim('pulsar_a_%d.simulate'%seed)
 	T.purgetim('pulsar_b_%d.simulate'%seed)
-	cmd = "python NestedSampling.py -N 2048 -t Free -s 1 --verbose --maxmcmc 1024 --nthreads 1 --parameters pulsar_a.par,pulsar_b.par --times pulsar_a_%d.simulate,pulsar_b_%d.simulate -o /data/projects/pulsar_timing/double_pulsar/whitenoise/logZ_noise/%d"%(seed,seed,seed)
+	cmd = "python NestedSampling.py -N 2048 -t Free -s 1 --verbose --maxmcmc 1024 --nthreads 1 --parameters pulsar_a.par,pulsar_b.par --times pulsar_a_%d.simulate,pulsar_b_%d.simulate -o /projects/pulsar_timing/nested_sampling/python/PTparallel/zeronoise/%d"%(seed,seed,seed)
 	os.system(cmd)
-	cmd = "python merge_runs.py -N 2048 -o /data/projects/pulsar_timing/double_pulsar/whitenoise/logZ_noise/%d/merged_chain.txt -p /data/projects/pulsar_timing/double_pulsar/whitenoise/logZ_noise/%d/posterior_samples.txt -e /data/projects/pulsar_timing/double_pulsar/whitenoise/logZ_noise/%d/header.txt /data/projects/pulsar_timing/double_pulsar/whitenoise/logZ_noise/%d/chain_Free_1.txt"%(seed,seed,seed,seed)
+	cmd = "python merge_runs.py -N 2048 -o /projects/pulsar_timing/nested_sampling/python/PTparallel/zeronoise/%d/merged_chain.txt -p /projects/pulsar_timing/nested_sampling/python/PTparallel/zeronoise/%d/posterior_samples.txt -e /projects/pulsar_timing/nested_sampling/python/PTparallel/zeronoise/%d/header.txt /projects/pulsar_timing/nested_sampling/python/PTparallel/zeronoise/%d/chain_Free_1.txt"%(seed,seed,seed,seed)
 	os.system(cmd)
-	cmd = "python PTPostProcess.py -i /data/projects/pulsar_timing/double_pulsar/whitenoise/logZ_noise/%d/posterior_samples.txt -e /data/projects/pulsar_timing/double_pulsar/whitenoise/logZ_noise/%d/merged_chain.txt_evidence -o /data/projects/pulsar_timing/double_pulsar/whitenoise/logZ_noise/%d/posplots --parameters pulsar_a.par,pulsar_b.par --times pulsar_a_%d.simulate,pulsar_b_%d.simulate --noise-model white --2D 1 --DPGMM 1"%(seed,seed,seed,seed,seed)
+	cmd = "python PTPostProcess.py -i /projects/pulsar_timing/nested_sampling/python/PTparallel/zeronoise/%d/posterior_samples.txt -e /projects/pulsar_timing/nested_sampling/python/PTparallel/zeronoise/%d/merged_chain.txt_evidence -o /projects/pulsar_timing/nested_sampling/python/PTparallel/zeronoise/%d/posplots --parameters pulsar_a.par,pulsar_b.par --times pulsar_a_%d.simulate,pulsar_b_%d.simulate --noise-model white --2D 1 --DPGMM 1"%(seed,seed,seed,seed,seed)
 	os.system(cmd)
 	

@@ -365,10 +365,11 @@ class NestedSampler(object):
         try:
             ACLs = []
             cov_array = np.squeeze([[np.float64(p[n]) for n in self.active_live.par_names] for p in self.cache])
+            N = len(self.cache)
             for i,n in enumerate(self.active_live.par_names):
               if self.params[0].vary[n]==1:
                 ACF = autocorrelation(cov_array[:,i])
-                ACL = sum(ACF**2)
+                ACL = np.min(np.where((ACF > -2./np.sqrt(N)) & (ACF < 2./np.sqrt(N)))[0])#sum(ACF**2)
                 if not(np.isnan(ACL)):
                   ACLs.append(ACL)
                   if self.verbose: sys.stderr.write("autocorrelation length %s = %.1f mean = %g standard deviation = %g\n"%(n,ACLs[-1],np.mean(cov_array[:,i]),np.std(cov_array[:,i])))
