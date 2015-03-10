@@ -1,0 +1,31 @@
+PSRJ        PSRB
+RAJ         07:37:51.24927  1
+DECJ        -30:39:40.7195  1
+F0          0.36056035506   1
+F1          -0.116e-15      1
+DM          48.920          1
+DMEPOCH     53156
+PEPOCH      53156
+POSEPOCH    53156
+PMRA        -3.3            1
+PMDEC       2.6             1
+PX          3               1
+SINI        0.997        1
+PB          0.10225156248   1
+PBDOT       -1.24777222555e-12      1
+T0          53155.9074280   1
+A1          1.51172166241      1
+OM          267.0331     1
+ECC         0.0877775   1
+OMDOT       16.8994339963   1
+GAMMA       0.000421012404194   1
+M2          1.3381  1
+BINARY      DD
+START       53000   0
+FINISH      54000   0
+TZRMJD      53500   0
+TZRFRQ      1413.400 0
+TZRSITE     7
+CLK         TT(BIPM2011)
+EPHEM       DE405
+EPHVER      5
