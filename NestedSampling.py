@@ -87,7 +87,7 @@ class NestedSampler(object):
         model to use for the noise
         default: white
     """
-    def __init__(self,parfiles,timfiles,Nlive=1024,maxmcmc=4096,model=None,output=None,verbose=True,seed=1,nthreads=None,prior=None,noise='white'):
+    def __init__(self,parfiles,timfiles,Nlive=1024,maxmcmc=4096,model=None,noise=None,output=None,verbose=True,seed=1,nthreads=None,prior=None):
         """
         Initialise all necessary arguments and variables for the algorithm
         """
@@ -97,6 +97,7 @@ class NestedSampler(object):
           self.nthreads = np.minimum(nthreads,mp.cpu_count()*2)
         self.prior_sampling = prior
         self.model = model
+        self.noise = noise
         self.setup_random_seed(seed)
         self.verbose = verbose
         self.task_queue =  deque(maxlen=self.nthreads)
@@ -128,7 +129,7 @@ class NestedSampler(object):
         for n in xrange(self.Nlive):
             while True:
                 if self.verbose: sys.stderr.write("sprinkling --> %.3f %% complete\r"%(100.0*float(n+1)/float(Nlive)))
-                self.params[n] = Parameter(self.pulsars,model=self.model)
+                self.params[n] = Parameter(self.pulsars,model=self.model,noise=self.noise)
                 self.params[n].set_bounds()
                 self.params[n].initialise()
                 self.params[n].logPrior()
@@ -140,7 +141,7 @@ class NestedSampler(object):
             self.dimension+=self.params[0].vary[n]
             if self.verbose: sys.stderr.write("%s in [%.15f,%.15f]\n"%(n,self.params[0].bounds[n][0],self.params[0].bounds[n][1]))
         self.scale = 2.0
-        self.active_live = Parameter(self.pulsars,model=self.model)
+        self.active_live = Parameter(self.pulsars,model=self.model,noise=self.noise)
         self.active_live.set_bounds()
         self.active_live.initialise()
         self.active_live.logPrior()
@@ -522,10 +523,11 @@ if __name__ == '__main__':
   parser.add_option("--times", type="string", dest="timfiles", help="pulsar time files, they must be ordered as the parameter files", default=None, action='callback',
                                       callback=parse_to_list)
   parser.add_option( "--sample-prior", action="store_true", dest="prior", help="draw samples from the prior", default=False)
+  parser.add_option( "--noise", dest="noise", type="string", help="noise model to assume", default="white")
   (options, args) = parser.parse_args()
   if len(options.parfiles)!= len(options.timfiles):
     sys.stderr.write("Fatal error! The number of par files is different from the number of times!\n")
     exit(-1)
 
-  NS = NestedSampler(options.parfiles,options.timfiles,model=options.model,Nlive=options.Nlive,maxmcmc=options.maxmcmc,output=options.output,verbose=options.verbose,nthreads=options.nthreads,prior=options.prior)
+  NS = NestedSampler(options.parfiles,options.timfiles,model=options.model,noise=options.noise,Nlive=options.Nlive,maxmcmc=options.maxmcmc,output=options.output,verbose=options.verbose,nthreads=options.nthreads,prior=options.prior)
   NS.nested_sampling()
