@@ -295,7 +295,7 @@ class Posterior:
         i = np.argsort(p.toas())
         tau = np.median(self.samples['logTAU_'+p.name])
         sigma = np.median(self.samples['logSIGMA_'+p.name])
-        equad = np.median(self.values['logEQUAD_'+p.name])
+        equad = np.median(self.samples['logEQUAD_'+p.name])
         err = 1.0e3 * p.toaerrs # in ns
         gp = george.GP(sigma * sigma* kernels.ExpSquaredKernel(tau*tau)+kernels.WhiteKernel(equad), solver=george.HODLRSolver)
         gp.compute(p.toas()[i], err[i])
@@ -311,7 +311,7 @@ class Posterior:
       ax = myfig.add_subplot(1,N,j)
       tau = np.median(self.samples['logTAU_'+singles.name])
       sigma = np.median(self.samples['logSIGMA_'+singles.name])
-      equad = np.median(self.values['logEQUAD_'+p.name])
+      equad = np.median(self.samples['logEQUAD_'+singles.name])
       for n in singles.pars:
         name = n+"_"+singles.name
         singles[n].val = np.copy(np.median(self.samples[name]))
@@ -373,7 +373,9 @@ class Posterior:
       sigmas = np.percentile(self.samples['logSIGMA_'+singles.name],[2.5,16.,50.0,84.,97.5],axis=0)
       equads = np.percentile(self.samples['logEQUAD_'+singles.name],[2.5,16.,50.0,84.,97.5],axis=0)
       for i,tau,sigma,equad in zip(xrange(5),taus,sigmas,equads):
-        autocovariance[i,:] = (sigma *sigma * np.exp(-0.5*(r/tau)**2)+equad)
+		  print i,tau,sigma,equad
+		  kernel = sigma *sigma * kernels.ExpSquaredKernel(tau*tau)+kernels.WhiteKernel(equad)
+		  autocovariance[i,:] = (sigma *sigma * np.exp(-0.5*(r/tau)**2)+equad)
 #      ax.semilogy(r,mean_acf,color='k')
 #      ax.semilogy(r,up_acf,color='r')
 #      ax.semilogy(r,down_acf,color='g')
@@ -392,8 +394,8 @@ class Posterior:
 #      ax.fill_between(freq,psds[0],psds[4],facecolor='r',alpha=0.5)
 #      ax.fill_between(freq,psds[1],psds[3],facecolor='b',alpha=0.5)
       ax.axvline(1.0/365.0,color='k')
-      #plt.yscale('log', nonposy='clip')
-      #plt.xscale('log')
+      plt.yscale('log', nonposy='clip')
+      plt.xscale('log')
       plt.ylabel("$P(f)/[s^2 d]$")
       plt.xlabel("$d^{-1}$")
       plt.ylim(1e-20,1e-10)
