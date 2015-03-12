@@ -295,8 +295,9 @@ class Posterior:
         i = np.argsort(p.toas())
         tau = np.median(self.samples['logTAU_'+p.name])
         sigma = np.median(self.samples['logSIGMA_'+p.name])
+        equad = np.median(self.values['logEQUAD_'+p.name])
         err = 1.0e3 * p.toaerrs # in ns
-        gp = george.GP(sigma * sigma* kernels.ExpSquaredKernel(tau*tau))
+        gp = george.GP(sigma * sigma* kernels.ExpSquaredKernel(tau*tau)+kernels.WhiteKernel(equad), solver=george.HODLRSolver)
         gp.compute(p.toas()[i], err[i])
         mu, cov = gp.predict(1e9*p.residuals(updatebats=True,formresiduals=True)[i],p.toas()[i])
         self.gp[p.name]=gp
@@ -310,12 +311,13 @@ class Posterior:
       ax = myfig.add_subplot(1,N,j)
       tau = np.median(self.samples['logTAU_'+singles.name])
       sigma = np.median(self.samples['logSIGMA_'+singles.name])
+      equad = np.median(self.values['logEQUAD_'+p.name])
       for n in singles.pars:
         name = n+"_"+singles.name
         singles[n].val = np.copy(np.median(self.samples[name]))
       i = np.argsort(singles.toas())
       err = 1.0e3 * singles.toaerrs # in ns
-      gp = george.GP(sigma *sigma * kernels.ExpSquaredKernel(tau*tau))
+      gp = george.GP(sigma *sigma * kernels.ExpSquaredKernel(tau*tau)+kernels.WhiteKernel(equad), solver=george.HODLRSolver)
       gp.compute(singles.toas()[i], err[i])
       mu, cov = gp.predict(1e9*singles.residuals(updatebats=True,formresiduals=True)[i],singles.toas()[i])
       self.gp[singles.name]=gp
@@ -348,8 +350,9 @@ class Posterior:
         i = np.argsort(p.toas())
         tau = np.median(self.samples['logTAU_'+p.name])
         sigma = np.median(self.samples['logSIGMA_'+p.name])
+        equad = np.median(self.samples['logEQUAD_'+p.name])
         err = 1.0e3 * p.toaerrs # in ns
-        gp = george.GP(sigma * sigma* kernels.ExpSquaredKernel(tau*tau))
+        gp = george.GP(sigma * sigma* kernels.ExpSquaredKernel(tau*tau)+kernels.WhiteKernel(equad), solver=george.HODLRSolver)
         gp.compute(p.toas()[i], err[i])
         mu, cov = gp.predict(1e9*p.residuals(updatebats=True,formresiduals=True)[i],p.toas()[i])
         self.gp[p.name]=gp
@@ -368,8 +371,9 @@ class Posterior:
       r = np.linspace(np.min(singles.toas()),np.max(singles.toas())+10000,M)
       taus = np.percentile(self.samples['logTAU_'+singles.name],[2.5,16.,50.0,84.,97.5],axis=0)
       sigmas = np.percentile(self.samples['logSIGMA_'+singles.name],[2.5,16.,50.0,84.,97.5],axis=0)
-      for i,tau,sigma in zip(xrange(5),taus,sigmas):
-        autocovariance[i,:] = (sigma *sigma * np.exp(-0.5*(r/tau)**2))
+      equads = np.percentile(self.samples['logEQUAD_'+singles.name],[2.5,16.,50.0,84.,97.5],axis=0)
+      for i,tau,sigma,equad in zip(xrange(5),taus,sigmas,equads):
+        autocovariance[i,:] = (sigma *sigma * np.exp(-0.5*(r/tau)**2)+equad)
 #      ax.semilogy(r,mean_acf,color='k')
 #      ax.semilogy(r,up_acf,color='r')
 #      ax.semilogy(r,down_acf,color='g')

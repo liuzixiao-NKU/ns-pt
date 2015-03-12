@@ -102,16 +102,22 @@ class Parameter(object):
 					self.vary_types.append(np.int)
 			if self.noisemodel=="red":
 				# now let's add the noise parameters, 2 per pulsar
-				self.par_names.append('TAU_'+binaries[0].name)
+				self.par_names.append('logTAU_'+binaries[0].name)
 				self.par_types.append(np.float128)
 				self.vary_types.append(np.int)
-				self.par_names.append('TAU_'+binaries[1].name)
+				self.par_names.append('logTAU_'+binaries[1].name)
 				self.par_types.append(np.float128)
 				self.vary_types.append(np.int)
-				self.par_names.append('SIGMA_'+binaries[0].name)
+				self.par_names.append('logSIGMA_'+binaries[0].name)
 				self.par_types.append(np.float128)
 				self.vary_types.append(np.int)
-				self.par_names.append('SIGMA_'+binaries[1].name)
+				self.par_names.append('logSIGMA_'+binaries[1].name)
+				self.par_types.append(np.float128)
+				self.vary_types.append(np.int)
+				self.par_names.append('logEQUAD_'+binaries[0].name)
+				self.par_types.append(np.float128)
+				self.vary_types.append(np.int)
+				self.par_names.append('logEQUAD_'+binaries[1].name)
 				self.par_types.append(np.float128)
 				self.vary_types.append(np.int)
 		# now let's add the single pulsars parameters
@@ -125,6 +131,9 @@ class Parameter(object):
 			self.par_types.append(np.float128)
 			self.vary_types.append(np.int)
 			self.par_names.append('logSIGMA_'+singles.name)
+			self.par_types.append(np.float128)
+			self.vary_types.append(np.int)			
+			self.par_names.append('logEQUAD_'+singles.name)
 			self.par_types.append(np.float128)
 			self.vary_types.append(np.int)
 		# now append the CG parameters
@@ -152,10 +161,14 @@ class Parameter(object):
 				self.bounds['logTAU_'+binaries[1].name] = [-3.,10.0]
 				self.bounds['logSIGMA_'+binaries[0].name] = [-3.,10.0] # in ns
 				self.bounds['logSIGMA_'+binaries[1].name] = [-3.,10.0] # in ns
+				self.bounds['logEQUAD_'+binaries[0].name] = [-3.,10.0] # in ns
+				self.bounds['logEQUAD_'+binaries[1].name] = [-3.,10.0] # in ns
 				self.vary['logTAU_'+binaries[0].name] = 1
 				self.vary['logTAU_'+binaries[1].name] = 1
 				self.vary['logSIGMA_'+binaries[0].name] = 1
-				self.vary['logSIGMA_'+binaries[1].name] = 1
+				self.vary['logSIGMA_'+binaries[1].name] = 1				
+				self.vary['logEQUAD_'+binaries[0].name] = 1
+				self.vary['logEQUAD_'+binaries[1].name] = 1
 			for n in binaries[0].pars:
 				if binaries[0].prefit[n].val == binaries[1].prefit[n].val:
 					name = n+"_"+binaries[0].name[:-1]
@@ -214,8 +227,10 @@ class Parameter(object):
 				# first set the noise parameters
 				self.bounds['logTAU_'+singles.name] = [-3.,10.0]
 				self.bounds['logSIGMA_'+singles.name] = [-3.,10.0] # in log(ns)
+				self.bounds['logEQUAD_'+singles.name] = [-3.,10.0] # in log(ns)
 				self.vary['logTAU_'+singles.name] = 1
 				self.vary['logSIGMA_'+singles.name] = 1
+				self.vary['logEQUAD_'+singles.name] = 1
 			for n in singles.pars:
 				a = singles[n].val-width*singles[n].err
 				b = singles[n].val+width*singles[n].err
@@ -336,14 +351,17 @@ class Parameter(object):
 				for p in binaries:
 					tau = np.exp(self.values['logTAU_'+p.name])
 					sigma = np.exp(self.values['logSIGMA_'+p.name])
-					self.gp[p.name] = george.GP(sigma * sigma * kernels.ExpSquaredKernel(tau*tau), solver=george.HODLRSolver)					
+					equad = np.exp(self.values['logEQUAD_'+p.name])[0]
+					self.gp[p.name] = george.GP(sigma * sigma * kernels.ExpSquaredKernel(tau*tau)+kernels.WhiteKernel(equad), solver=george.HODLRSolver)					
 					err = 1.0e3 * p.toaerrs # in ns
 					i = np.argsort(p.toas())
 					self.gp[p.name].compute(p.toas()[i], err[i])
 			for singles in self.pulsars['singles']:
 					tau = np.exp(self.values['logTAU_'+singles.name])
 					sigma = np.exp(self.values['logSIGMA_'+singles.name])
-					self.gp[singles.name] = george.GP(sigma * sigma * kernels.ExpSquaredKernel(tau*tau), solver=george.HODLRSolver)			
+					equad = np.exp(self.values['logEQUAD_'+singles.name])[0]
+					kernel = sigma * sigma * kernels.ExpSquaredKernel(tau*tau)+kernels.WhiteKernel(equad)
+					self.gp[singles.name] = george.GP(kernel, solver=george.HODLRSolver)			
 					err = 1.0e3 * singles.toaerrs # in ns
 					i = np.argsort(singles.toas())		
 					self.gp[singles.name].compute(singles.toas()[i], err[i])
@@ -408,8 +426,10 @@ class Parameter(object):
 			for p in binaries:
 				tau = self.values['logTAU_'+p.name]
 				sigma = self.values['logSIGMA_'+p.name]
+				equad = self.values['logEQUAD_'+p.name]
 				self.gp[p.name].kernel[0] = sigma
 				self.gp[p.name].kernel[1] = tau
+				self.gp[p.name].kernel[2] = equad
 				i = np.argsort(p.toas())
 				err = 1.0e3 * p.toaerrs # in ns
 				self.gp[p.name].compute(p.toas()[i], err[i])
@@ -423,6 +443,7 @@ class Parameter(object):
 		for singles in self.pulsars['singles']:
 			tau = self.values['logTAU_'+singles.name]
 			sigma = self.values['logSIGMA_'+singles.name]
+			equad = self.values['logEQUAD_'+singles.name]
 			for n in singles.pars:
 				name = n+"_"+singles.name
 				if self.vary[name]!=0:
@@ -431,6 +452,7 @@ class Parameter(object):
 			i = np.argsort(singles.toas())
 			self.gp[singles.name].kernel[0] = sigma
 			self.gp[singles.name].kernel[1] = tau
+			self.gp[singles.name].kernel[2] = equad
 			self.gp[singles.name].compute(singles.toas()[i], err[i])
 			res = 1e9*np.array(singles.residuals(updatebats=True,formresiduals=True)[i],dtype=np.float128) # in ns
 			try:
