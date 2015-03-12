@@ -6,7 +6,7 @@ import threading
 from NestedSampling import *
 
 def NSwrapper(args):
-	NS = NestedSampler(args[0],args[1],model=args[2],Nlive=args[3],maxmcmc=args[4],verbose=args[5],output=args[6],seed=args[7],nthreads=args[8])
+	NS = NestedSampler(args[0],args[1],model=args[2],noise=args[3],Nlive=args[4],maxmcmc=args[5],verbose=args[6],output=args[7],seed=args[8],nthreads=args[9])
 	NS.nested_sampling()
 	return 1
   
