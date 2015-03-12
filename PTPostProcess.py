@@ -61,7 +61,7 @@ def set_tick_sizes(ax, major, minor):
     ax.xaxis.LABELPAD=10.
     ax.xaxis.OFFSETTEXTPAD=10.
 
-maxStick=8
+maxStick=16
 
 class Posterior:
   def __init__(self,data_file,evidence_file,pulsars=None,dpgmm=0):
@@ -92,18 +92,18 @@ class Posterior:
     # transform the samples in standard format
     m = np.mean(self.samples[name])
     s = np.std(self.samples[name])
-    if (self.pulsars!=None) and (name!='GOB' and name!='XI' and name!='EPS' and name!='KAPPA' and 'TAU' not in name and 'SIGMA' not in name):
-      fields = name.split('_')
-      if fields[-1]=='PSR':
-        injection = self.pulsars.pulsars['binaries'][0][0].prefit[str(fields[0])].val
-      elif fields[-1]=='PSRA':
-        injection = self.pulsars.pulsars['binaries'][0][0].prefit[str(fields[0])].val
-      elif fields[-1]=='PSRB':
-        injection = self.pulsars.pulsars['binaries'][0][1].prefit[str(fields[0])].val
-      elif self.pulsars.pulsars['singles']!=None and fields[0]!='logL':
-        injection = self.pulsars.pulsars['singles'][0].prefit[str(fields[0])].val
-      else:
-        injection = None
+    #if (self.pulsars!=None) and (name!='GOB' and name!='XI' and name!='EPS' and name!='KAPPA' and 'TAU' not in name and 'SIGMA' not in name):
+      #fields = name.split('_')
+      #if fields[-1]=='PSR':
+        #injection = self.pulsars.pulsars['binaries'][0][0].prefit[str(fields[0])].val
+      #elif fields[-1]=='PSRA':
+        #injection = self.pulsars.pulsars['binaries'][0][0].prefit[str(fields[0])].val
+      #elif fields[-1]=='PSRB':
+        #injection = self.pulsars.pulsars['binaries'][0][1].prefit[str(fields[0])].val
+      #elif self.pulsars.pulsars['singles']!=None and fields[0]!='logL':
+        #injection = self.pulsars.pulsars['singles'][0].prefit[str(fields[0])].val
+      #else:
+    injection = None
     if self.dpgmm:
       model = DPGMM(1)
       if s > 0.0:
@@ -388,8 +388,8 @@ class Posterior:
 #      ax.fill_between(freq,psds[0],psds[4],facecolor='r',alpha=0.5)
 #      ax.fill_between(freq,psds[1],psds[3],facecolor='b',alpha=0.5)
       ax.axvline(1.0/365.0,color='k')
-      plt.yscale('log', nonposy='clip')
-      plt.xscale('log')
+      #plt.yscale('log', nonposy='clip')
+      #plt.xscale('log')
       plt.ylabel("$P(f)/[s^2 d]$")
       plt.xlabel("$d^{-1}$")
       plt.ylim(1e-20,1e-10)
@@ -572,7 +572,6 @@ if __name__=='__main__':
     htmlfile.write('<tr><td><img src="psd.png">')
     htmlfile.write('<br><hr>')
   
-  exit()
   myfig_pos = posteriors.plotresiduals()
   myfig_pos.savefig(location+'/residuals.png',bbox_inches='tight')
   myfig_pos.savefig(location+'/residuals.pdf',bbox_inches='tight')

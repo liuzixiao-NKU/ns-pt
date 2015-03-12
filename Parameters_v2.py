@@ -22,11 +22,11 @@ def computeLogLinj(pulsars):
 	for p in pulsars:
 		for n in p.pars:
 			p[n].val = np.copy(p.prefit[n].val)
-		err = 1.0e-6 * p.toaerrs
+		err = 1.0e3 * p.toaerrs
 		Cdiag = (err)**2
 		Cinv = np.diag(1.0/Cdiag)
 		logCdet = np.sum(np.log(Cdiag))
-		res = np.array(p.residuals(updatebats=True,formresiduals=True),dtype=np.float128)
+		res = 1e9*np.array(p.residuals(updatebats=True,formresiduals=True),dtype=np.float128)
 		logL+= -0.5 * np.dot(res,np.dot(Cinv,res))- 0.5 * logCdet - 0.5 * len(res) * np.log(2.0*np.pi)
 	return logL
 
@@ -48,6 +48,7 @@ class Parameter(object):
 			self.logLikelihood = self.logLikelihood_whitenoise
 		elif self.noisemodel=="red":
 			self.logLikelihood = self.logLikelihood_rednoise
+			self.gp={}
 		else:
 			sys.stderr.write("Noise model not implemented!")
 			exit(-1)
@@ -329,6 +330,23 @@ class Parameter(object):
 				self._internalvalues[n] = np.random.uniform(-1.0,1.0)
 		self.map()
 		self.constraint()
+		# now initialise the Gaussian process for the red noise if necessary
+		if self.noisemodel=="red":
+			for binaries in self.pulsars['binaries']:
+				for p in binaries:
+					tau = np.exp(self.values['logTAU_'+p.name])
+					sigma = np.exp(self.values['logSIGMA_'+p.name])
+					self.gp[p.name] = george.GP(sigma * sigma * kernels.ExpSquaredKernel(tau*tau), solver=george.HODLRSolver)					
+					err = 1.0e3 * p.toaerrs # in ns
+					i = np.argsort(p.toas())
+					self.gp[p.name].compute(p.toas()[i], err[i])
+			for singles in self.pulsars['singles']:
+					tau = np.exp(self.values['logTAU_'+singles.name])
+					sigma = np.exp(self.values['logSIGMA_'+singles.name])
+					self.gp[singles.name] = george.GP(sigma * sigma * kernels.ExpSquaredKernel(tau*tau), solver=george.HODLRSolver)			
+					err = 1.0e3 * singles.toaerrs # in ns
+					i = np.argsort(singles.toas())		
+					self.gp[singles.name].compute(singles.toas()[i], err[i])
 
 	def logLikelihood_whitenoise(self):
 		"""
@@ -354,7 +372,7 @@ class Parameter(object):
 				Cinv = np.diag(1.0/Cdiag)
 				logCdet = np.sum(np.log(Cdiag))
 				res =  1e9*np.array(p.residuals(updatebats=True,formresiduals=True),dtype=np.float128)
-				self.logL+= -0.5 * np.dot(res,np.dot(Cinv,res))#- 0.5 * logCdet - 0.5 * len(res) * np.log(2.0*np.pi)
+				self.logL+= -0.5 * np.dot(res,np.dot(Cinv,res))- 0.5 * logCdet - 0.5 * len(res) * np.log(2.0*np.pi)
 				
 		for singles in self.pulsars['singles']:
 			for n in singles.pars:
@@ -366,7 +384,7 @@ class Parameter(object):
 			Cinv = np.diag(1.0/Cdiag)
 			logCdet = np.sum(np.log(Cdiag))
 			res = 1e9*np.array(singles.residuals(updatebats=True,formresiduals=True),dtype=np.float128)
-			self.logL+= -0.5 * np.dot(res,np.dot(Cinv,res))#- 0.5 * logCdet - 0.5 * len(res) * np.log(2.0*np.pi)
+			self.logL+= -0.5 * np.dot(res,np.dot(Cinv,res))- 0.5 * logCdet - 0.5 * len(res) * np.log(2.0*np.pi)
 		return self.logL
 
 	def logLikelihood_rednoise(self):
@@ -388,28 +406,38 @@ class Parameter(object):
 						if self.vary[name]!=0:
 							p[n].val = np.copy(self.values[name])
 			for p in binaries:
-				tau = np.exp(self.values['logTAU_'+p.name])
-				sigma = np.exp(self.values['logSIGMA_'+p.name])
-				gp = george.GP(sigma * sigma * kernels.ExpSquaredKernel(tau*tau))
+				tau = self.values['logTAU_'+p.name]
+				sigma = self.values['logSIGMA_'+p.name]
+				self.gp[p.name].kernel[0] = sigma
+				self.gp[p.name].kernel[1] = tau
 				i = np.argsort(p.toas())
 				err = 1.0e3 * p.toaerrs # in ns
-				gp.compute(p.toas()[i], err[i])
+				self.gp[p.name].compute(p.toas()[i], err[i])
 				res = 1e9*np.array(p.residuals(updatebats=True,formresiduals=True)[i],dtype=np.float128) # in ns
-				self.logL+= gp.lnlikelihood(res,quiet=True)
+				try:
+					self.logL+=self.gp[p.name].lnlikelihood(res,quiet=True)
+				except:
+					self.logL = -np.inf
+					return self.logL
 		
 		for singles in self.pulsars['singles']:
-			tau = np.exp(self.values['logTAU_'+singles.name])
-			sigma = np.exp(self.values['logSIGMA_'+singles.name])
+			tau = self.values['logTAU_'+singles.name]
+			sigma = self.values['logSIGMA_'+singles.name]
 			for n in singles.pars:
 				name = n+"_"+singles.name
 				if self.vary[name]!=0:
 					singles[n].val = np.copy(self.values[name])
 			err = 1.0e3 * singles.toaerrs # in ns
 			i = np.argsort(singles.toas())
-			gp = george.GP(sigma * kernels.ExpSquaredKernel(tau))
-			gp.compute(singles.toas()[i], err[i])
+			self.gp[singles.name].kernel[0] = sigma
+			self.gp[singles.name].kernel[1] = tau
+			self.gp[singles.name].compute(singles.toas()[i], err[i])
 			res = 1e9*np.array(singles.residuals(updatebats=True,formresiduals=True)[i],dtype=np.float128) # in ns
-			self.logL+= gp.lnlikelihood(res,quiet=True)
+			try:
+				self.logL+=self.gp[singles.name].lnlikelihood(res,quiet=True)
+			except:
+				self.logL = -np.inf
+				return self.logL			
 		return self.logL
 
 if __name__ == '__main__':
