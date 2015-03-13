@@ -365,17 +365,14 @@ class Posterior:
     for singles in self.pulsars.pulsars['singles']:
       ax = myfig.add_subplot(1,N,j)
       M = 8*4096
-      autocovariance = np.zeros((5,M))
       samps = xrange(np.size(self.samples['logL']))
-#      r = np.linspace(0.0,10000,M)
+      autocovariance = np.zeros((np.size(self.samples['logL']),M))
       r = np.linspace(np.min(singles.toas()),np.max(singles.toas())+10000,M)
-      taus = np.percentile(self.samples['logTAU_'+singles.name],[2.5,16.,50.0,84.,97.5],axis=0)
-      sigmas = np.percentile(self.samples['logSIGMA_'+singles.name],[2.5,16.,50.0,84.,97.5],axis=0)
-      equads = np.percentile(self.samples['logEQUAD_'+singles.name],[2.5,16.,50.0,84.,97.5],axis=0)
-      for i,tau,sigma,equad in zip(xrange(5),taus,sigmas,equads):
-		  print i,tau,sigma,equad
-		  kernel = sigma *sigma * kernels.ExpSquaredKernel(tau*tau)+kernels.WhiteKernel(equad)
-		  autocovariance[i,:] = (sigma *sigma * np.exp(-0.5*(r/tau)**2)+equad)
+      taus = self.samples['logTAU_'+singles.name]
+      sigmas = self.samples['logSIGMA_'+singles.name]
+      equads = self.samples['logEQUAD_'+singles.name]
+      for i,tau,sigma,equad in zip(xrange(np.size(self.samples['logL'])),taus,sigmas,equads):
+          autocovariance[i,:] = (sigma *sigma * np.exp(-0.5*(r/tau)**2)+equad)
 #      ax.semilogy(r,mean_acf,color='k')
 #      ax.semilogy(r,up_acf,color='r')
 #      ax.semilogy(r,down_acf,color='g')
@@ -384,21 +381,27 @@ class Posterior:
       colors = ['r','b','k','b','r']
       frequency = []
       psds = []
-      for i in xrange(5):
+      for i in xrange(np.size(self.samples['logL'])):
         frequency.append(np.fft.rfftfreq(np.size(autocovariance[i,:]),np.diff(r)[0]))
-        psds.append(1e-18*np.fft.rfft(autocovariance[i,:]).real)#+1e-12*np.mean(singles.toaerrs**2))
-      for c,f,psd in zip(colors,frequency,psds):
-#        if c=='k':
-        freq = f
-        ax.plot(f,psd,color=c)
-#      ax.fill_between(freq,psds[0],psds[4],facecolor='r',alpha=0.5)
-#      ax.fill_between(freq,psds[1],psds[3],facecolor='b',alpha=0.5)
+        psds.append(1e-18*(np.fft.rfft(autocovariance[i,:]).real))#+1e-12*np.mean(singles.toaerrs**2))
+#      for i in xrange(np.size(self.samples['logL'])):
+##        if c=='k':
+#        ax.plot(frequency[i],psds[i],color='0.9',alpha=0.5)
+#        ax.plot(f,psd+1e-18*equads[i],color=c,linestyle='--')
+#ax.fill_between(frequency[0],np.percentile(psds,2.5,axis=0),np.percentile(psds,97.5,axis=0),facecolor='r',alpha=0.5)
+      #ax.fill_between(frequency[0],np.percentile(psds,16.,axis=0),np.percentile(psds,84.,axis=0),facecolor='b',alpha=0.5)
+      ax.plot(frequency[0],np.percentile(psds,2.5,axis=0),color='r')
+      ax.plot(frequency[0],np.percentile(psds,97.5,axis=0),color='r')
+      ax.plot(frequency[0],np.percentile(psds,16.,axis=0),color='b')
+      ax.plot(frequency[0],np.percentile(psds,84.,axis=0),color='b')
+      ax.plot(frequency[0],np.median(psds,axis=0),color='k')
+      ax.axhline(1e-18*np.median(equads),color='g')
       ax.axvline(1.0/365.0,color='k')
       plt.yscale('log', nonposy='clip')
       plt.xscale('log')
       plt.ylabel("$P(f)/[s^2 d]$")
       plt.xlabel("$d^{-1}$")
-      plt.ylim(1e-20,1e-10)
+      plt.ylim(1e-20,1e-8)
       plt.xlim(1e-4,1.0)
       plt.grid(alpha=0.5)
       plt.title(r"$\mathrm{power}$ $\mathrm{spectral}$ $\mathrm{density}$ $\mathrm{%s}$"%singles.name, y=1.10)
@@ -577,7 +580,7 @@ if __name__=='__main__':
     myfig_pos.clf()
     htmlfile.write('<tr><td><img src="psd.png">')
     htmlfile.write('<br><hr>')
-  
+
   myfig_pos = posteriors.plotresiduals()
   myfig_pos.savefig(location+'/residuals.png',bbox_inches='tight')
   myfig_pos.savefig(location+'/residuals.pdf',bbox_inches='tight')

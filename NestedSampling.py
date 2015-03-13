@@ -85,7 +85,7 @@ class NestedSampler(object):
         
     noise:
         model to use for the noise
-        default: white
+        default: None
     """
     def __init__(self,parfiles,timfiles,Nlive=1024,maxmcmc=4096,model=None,noise=None,output=None,verbose=True,seed=1,nthreads=None,prior=None):
         """
@@ -523,7 +523,7 @@ if __name__ == '__main__':
   parser.add_option("--times", type="string", dest="timfiles", help="pulsar time files, they must be ordered as the parameter files", default=None, action='callback',
                                       callback=parse_to_list)
   parser.add_option( "--sample-prior", action="store_true", dest="prior", help="draw samples from the prior", default=False)
-  parser.add_option( "--noise", dest="noise", type="string", help="noise model to assume", default="white")
+  parser.add_option( "--noise", dest="noise", type="string", help="noise model to assume", default=None)
   (options, args) = parser.parse_args()
   if len(options.parfiles)!= len(options.timfiles):
     sys.stderr.write("Fatal error! The number of par files is different from the number of times!\n")
