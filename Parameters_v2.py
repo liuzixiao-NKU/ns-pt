@@ -356,31 +356,31 @@ class Parameter(object):
                 self._internalvalues[n] = np.random.uniform(-1.0,1.0)
         self.map()
         self.constraint()
-        # now initialise the Gaussian process for the red noise if necessary
-        if self.noisemodel=="white" or self.noisemodel=="red":
-            for binaries in self.pulsars['binaries']:
-                for p in binaries:
-                    equad = np.exp(self.values['logEQUAD_'+p.name])[0]
-                    kernel = kernels.WhiteKernel(equad)
-                    if self.noisemodel=="red":
-                        sigma = np.exp(self.values['logSIGMA_'+p.name])
-                        tau = np.exp(self.values['logTAU_'+p.name])
-                        kernel = kernel+sigma * sigma * kernels.ExpSquaredKernel(tau*tau)
-                    self.gp[p.name] = george.GP(kernel)
-                    err = 1.0e3 * p.toaerrs # in ns
-                    i = np.argsort(p.toas())
-                    self.gp[p.name].compute(p.toas()[i], err[i])
-            for singles in self.pulsars['singles']:
-                    equad = np.exp(self.values['logEQUAD_'+singles.name])[0]
-                    kernel = kernels.WhiteKernel(equad)
-                    if self.noisemodel=="red":
-                        tau = np.exp(self.values['logTAU_'+singles.name])
-                        sigma = np.exp(self.values['logSIGMA_'+singles.name])
-                        kernel = kernel+sigma * sigma * kernels.ExpSquaredKernel(tau*tau)
-                    self.gp[singles.name] = george.GP(kernel)			
-                    err = 1.0e3 * singles.toaerrs # in ns
-                    i = np.argsort(singles.toas())		
-                    self.gp[singles.name].compute(singles.toas()[i], err[i])
+#        # now initialise the Gaussian process for the red noise if necessary
+#        if self.noisemodel=="white" or self.noisemodel=="red":
+#            for binaries in self.pulsars['binaries']:
+#                for p in binaries:
+#                    equad = np.exp(self.values['logEQUAD_'+p.name])[0]
+#                    kernel = kernels.WhiteKernel(equad)
+#                    if self.noisemodel=="red":
+#                        sigma = np.exp(self.values['logSIGMA_'+p.name])
+#                        tau = np.exp(self.values['logTAU_'+p.name])
+#                        kernel = kernel+sigma * sigma * kernels.ExpSquaredKernel(tau*tau)
+#                    self.gp[p.name] = george.GP(kernel)
+#                    err = 1.0e3 * p.toaerrs # in ns
+#                    i = np.argsort(p.toas())
+#                    self.gp[p.name].compute(p.toas()[i], err[i])
+#            for singles in self.pulsars['singles']:
+#                    equad = np.exp(self.values['logEQUAD_'+singles.name])[0]
+#                    kernel = kernels.WhiteKernel(equad)
+#                    if self.noisemodel=="red":
+#                        tau = np.exp(self.values['logTAU_'+singles.name])
+#                        sigma = np.exp(self.values['logSIGMA_'+singles.name])
+#                        kernel = kernel+sigma * sigma * kernels.ExpSquaredKernel(tau*tau)
+#                    self.gp[singles.name] = george.GP(kernel)
+#                    err = 1.0e3 * singles.toaerrs # in ns
+#                    i = np.argsort(singles.toas())		
+#                    self.gp[singles.name].compute(singles.toas()[i], err[i])
 
     def logLikelihood_naive(self):
         """
@@ -440,34 +440,36 @@ class Parameter(object):
                         if self.vary[name]!=0:
                             p[n].val = np.copy(self.values[name])
             for p in binaries:
-                equad = self.values['logEQUAD_'+p.name]
-                self.gp[p.name].kernel[0] = equad
+                equad = np.exp(self.values['logEQUAD_'+p.name])[0]
+                kernel = kernels.ExpSquaredKernel(tau*tau)
+                gp = george.GP(kernel)
                 i = np.argsort(p.toas())
                 err = 1.0e3 * p.toaerrs # in ns
-                self.gp[p.name].compute(p.toas()[i], err[i])
+                gp.compute(p.toas()[i], err[i])
                 res = 1e9*np.array(p.residuals(updatebats=True,formresiduals=True)[i],dtype=np.float128) # in ns
                 try:
-                    self.logL+=self.gp[p.name].lnlikelihood(res,quiet=True)
+                    self.logL+=gp.lnlikelihood(res,quiet=True)
                 except:
                     self.logL = -np.inf
                     return self.logL
 
         for singles in self.pulsars['singles']:
-            equad = self.values['logEQUAD_'+singles.name]
             for n in singles.pars:
                 name = n+"_"+singles.name
                 if self.vary[name]!=0:
                     singles[n].val = np.copy(self.values[name])
+            equad = np.exp(self.values['logEQUAD_'+singles.name])[0]
+            kernel = kernels.WhiteKernel(equad)
+            gp = george.GP(kernel)
             err = 1.0e3 * singles.toaerrs # in ns
             i = np.argsort(singles.toas())
-            self.gp[singles.name].kernel[0] = equad
-            self.gp[singles.name].compute(singles.toas()[i], err[i])
+            gp.compute(singles.toas()[i], err[i])
             res = 1e9*np.array(singles.residuals(updatebats=True,formresiduals=True)[i],dtype=np.float128) # in ns
             try:
-                self.logL+=self.gp[singles.name].lnlikelihood(res,quiet=True)
+                self.logL+=gp.lnlikelihood(res,quiet=True)
             except:
                 self.logL = -np.inf
-            return self.logL
+                return self.logL
         return self.logL
 
     def logLikelihood_rednoise(self):
@@ -489,39 +491,37 @@ class Parameter(object):
                         if self.vary[name]!=0:
                             p[n].val = np.copy(self.values[name])
             for p in binaries:
-                tau = self.values['logTAU_'+p.name]
-                sigma = self.values['logSIGMA_'+p.name]
-                equad = self.values['logEQUAD_'+p.name]
-                self.gp[p.name].kernel[0] = equad
-                self.gp[p.name].kernel[1] = tau
-                self.gp[p.name].kernel[2] = sigma
+                tau = np.exp(self.values['logTAU_'+p.name])
+                sigma = np.exp(self.values['logSIGMA_'+p.name])
+                equad = np.exp(self.values['logEQUAD_'+p.name])[0]
+                kernel = kernels.WhiteKernel(equad)+sigma * sigma * kernels.ExpSquaredKernel(tau*tau)
+                gp = george.GP(kernel)
                 i = np.argsort(p.toas())
                 err = 1.0e3 * p.toaerrs # in ns
-                self.gp[p.name].compute(p.toas()[i], err[i])
+                gp.compute(p.toas()[i], err[i])
                 res = 1e9*np.array(p.residuals(updatebats=True,formresiduals=True)[i],dtype=np.float128) # in ns
                 try:
-                    self.logL+=self.gp[p.name].lnlikelihood(res,quiet=True)
+                    self.logL+=gp.lnlikelihood(res,quiet=True)
                 except:
                     self.logL = -np.inf
                     return self.logL
 
         for singles in self.pulsars['singles']:
-            tau = self.values['logTAU_'+singles.name]
-            sigma = self.values['logSIGMA_'+singles.name]
-            equad = self.values['logEQUAD_'+singles.name]
             for n in singles.pars:
                 name = n+"_"+singles.name
                 if self.vary[name]!=0:
                     singles[n].val = np.copy(self.values[name])
+            tau = np.exp(self.values['logTAU_'+singles.name])
+            sigma = np.exp(self.values['logSIGMA_'+singles.name])
+            equad = np.exp(self.values['logEQUAD_'+singles.name])[0]
+            kernel = kernels.WhiteKernel(equad)+sigma * sigma * kernels.ExpSquaredKernel(tau*tau)
             err = 1.0e3 * singles.toaerrs # in ns
             i = np.argsort(singles.toas())
-            self.gp[singles.name].kernel[0] = equad
-            self.gp[singles.name].kernel[1] = tau
-            self.gp[singles.name].kernel[2] = sigma
-            self.gp[singles.name].compute(singles.toas()[i], err[i])
+            gp = george.GP(kernel)
+            gp.compute(singles.toas()[i], err[i])
             res = 1e9*np.array(singles.residuals(updatebats=True,formresiduals=True)[i],dtype=np.float128) # in ns
             try:
-                self.logL+=self.gp[singles.name].lnlikelihood(res,quiet=True)
+                self.logL+=gp.lnlikelihood(res,quiet=True)
             except:
                 self.logL = -np.inf
                 return self.logL
