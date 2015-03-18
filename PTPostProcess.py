@@ -267,8 +267,8 @@ class Posterior:
       i = np.argsort(singles.toas())
       residuals = 1e9*singles.residuals(updatebats=True,formresiduals=True)[i]
       mu, cov = self.gp[singles.name].predict(residuals,singles.toas()[i])
-      full_residuals = residuals+mu
-      full_residuals_errors = np.sqrt((1e3*singles.toaerrs[i])**2+1.0/np.diag(cov))
+      full_residuals = residuals
+      full_residuals_errors = (1e3*singles.toaerrs[i])
       plt.errorbar(singles.toas()[i],full_residuals,yerr=full_residuals_errors,fmt='.',label=singles.name+" rms = %.3f ns"%np.sqrt(np.mean(full_residuals_errors**2)));
     plt.xlabel("$\mathrm{MJD}$",fontsize=18)
     plt.ylabel(r"$\mathrm{residuals}/\mathrm{ns}$",fontsize=18)
@@ -293,11 +293,11 @@ class Posterior:
       for p in binaries:
         ax = myfig.add_subplot(1,N,j)
         i = np.argsort(p.toas())
-        tau = np.median(self.samples['logTAU_'+p.name])
-        sigma = np.median(self.samples['logSIGMA_'+p.name])
-        equad = np.median(self.samples['logEQUAD_'+p.name])
+        tau = np.median(1e-9*self.samples['logTAU_'+p.name])
+        sigma = np.median(1e-9*self.samples['logSIGMA_'+p.name])
+        equad = np.median(1e-9*self.samples['logEQUAD_'+p.name])
         err = 1.0e3 * p.toaerrs # in ns
-        gp = george.GP(sigma * sigma* kernels.ExpSquaredKernel(tau*tau)+kernels.WhiteKernel(equad), solver=george.HODLRSolver)
+        gp = george.GP(sigma * sigma* kernels.ExpSquaredKernel(tau*tau)+kernels.WhiteKernel(equad*equad))
         gp.compute(p.toas()[i], err[i])
         mu, cov = gp.predict(1e9*p.residuals(updatebats=True,formresiduals=True)[i],p.toas()[i])
         self.gp[p.name]=gp
@@ -309,15 +309,15 @@ class Posterior:
         j+=1
     for singles in self.pulsars.pulsars['singles']:
       ax = myfig.add_subplot(1,N,j)
-      tau = np.median(self.samples['logTAU_'+singles.name])
-      sigma = np.median(self.samples['logSIGMA_'+singles.name])
-      equad = np.median(self.samples['logEQUAD_'+singles.name])
+      tau = np.median(1e-9*self.samples['logTAU_'+singles.name])
+      sigma = np.median(1e-9*self.samples['logSIGMA_'+singles.name])
+      equad = np.median(1e-9*self.samples['logEQUAD_'+singles.name])
       for n in singles.pars:
         name = n+"_"+singles.name
         singles[n].val = np.copy(np.median(self.samples[name]))
       i = np.argsort(singles.toas())
       err = 1.0e3 * singles.toaerrs # in ns
-      gp = george.GP(sigma *sigma * kernels.ExpSquaredKernel(tau*tau)+kernels.WhiteKernel(equad), solver=george.HODLRSolver)
+      gp = george.GP(sigma *sigma * kernels.ExpSquaredKernel(tau*tau)+kernels.WhiteKernel(equad*equad))
       gp.compute(singles.toas()[i], err[i])
       mu, cov = gp.predict(1e9*singles.residuals(updatebats=True,formresiduals=True)[i],singles.toas()[i])
       self.gp[singles.name]=gp
@@ -348,11 +348,11 @@ class Posterior:
       for p in binaries:
         ax = myfig.add_subplot(1,N,j)
         i = np.argsort(p.toas())
-        tau = np.median(self.samples['logTAU_'+p.name])
-        sigma = np.median(self.samples['logSIGMA_'+p.name])
-        equad = np.median(self.samples['logEQUAD_'+p.name])
+        tau = np.median(1e-9*self.samples['logTAU_'+p.name])
+        sigma = np.median(1e-9*self.samples['logSIGMA_'+p.name])
+        equad = np.median(1e-9*self.samples['logEQUAD_'+p.name])
         err = 1.0e3 * p.toaerrs # in ns
-        gp = george.GP(sigma * sigma* kernels.ExpSquaredKernel(tau*tau)+kernels.WhiteKernel(equad), solver=george.HODLRSolver)
+        gp = george.GP(sigma * sigma* kernels.ExpSquaredKernel(tau*tau)+kernels.WhiteKernel(equad*equad))
         gp.compute(p.toas()[i], err[i])
         mu, cov = gp.predict(1e9*p.residuals(updatebats=True,formresiduals=True)[i],p.toas()[i])
         self.gp[p.name]=gp
@@ -367,8 +367,8 @@ class Posterior:
       M = 8*4096
       samps = xrange(np.size(self.samples['logL']))
       autocovariance = np.zeros((np.size(self.samples['logL']),M))
-      r = np.linspace(np.min(singles.toas()),np.max(singles.toas())+10000,M)
-      taus = self.samples['logTAU_'+singles.name]
+      r = np.linspace(0.0,100000.0,M)
+      taus = 1e-9*self.samples['logTAU_'+singles.name]
       sigmas = self.samples['logSIGMA_'+singles.name]
       equads = self.samples['logEQUAD_'+singles.name]
       for i,tau,sigma,equad in zip(xrange(np.size(self.samples['logL'])),taus,sigmas,equads):
@@ -401,8 +401,8 @@ class Posterior:
       plt.xscale('log')
       plt.ylabel("$P(f)/[s^2 d]$")
       plt.xlabel("$d^{-1}$")
-      plt.ylim(1e-20,1e-8)
-      plt.xlim(1e-4,1.0)
+#      plt.ylim(1e-20,1e-8)
+#      plt.xlim(1e-4,1.0)
       plt.grid(alpha=0.5)
       plt.title(r"$\mathrm{power}$ $\mathrm{spectral}$ $\mathrm{density}$ $\mathrm{%s}$"%singles.name, y=1.10)
       j+=1

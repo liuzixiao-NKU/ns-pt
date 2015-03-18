@@ -375,7 +375,7 @@ class NestedSampler(object):
                   ACLs.append(ACL)
                   if self.verbose: sys.stderr.write("autocorrelation length %s = %.1f mean = %g standard deviation = %g\n"%(n,ACLs[-1],np.mean(cov_array[:,i]),np.std(cov_array[:,i])))
             self.Nmcmc =int(self.thinning*(np.max(ACLs)))
-            if self.Nmcmc < 32: self.Nmcmc = 32
+            if self.Nmcmc < 16: self.Nmcmc = 16
             if self.Nmcmc > self.maxmcmc:
                 if self.verbose: sys.stderr.write("Warning ACL --> %d!\n"%self.Nmcmc)
                 self.Nmcmc = self.maxmcmc
