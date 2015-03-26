@@ -529,5 +529,5 @@ if __name__ == '__main__':
     sys.stderr.write("Fatal error! The number of par files is different from the number of times!\n")
     exit(-1)
 
-  NS = NestedSampler(options.parfiles,options.timfiles,model=options.model,noise=options.noise,Nlive=options.Nlive,maxmcmc=options.maxmcmc,output=options.output,verbose=options.verbose,nthreads=options.nthreads,prior=options.prior)
+  NS = NestedSampler(options.parfiles,options.timfiles,model=options.model,seed=options.seed,noise=options.noise,Nlive=options.Nlive,maxmcmc=options.maxmcmc,output=options.output,verbose=options.verbose,nthreads=options.nthreads,prior=options.prior)
   NS.nested_sampling()
