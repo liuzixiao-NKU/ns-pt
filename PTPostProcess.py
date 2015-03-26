@@ -367,10 +367,10 @@ class Posterior:
         j+=1
     for singles in self.pulsars.pulsars['singles']:
       ax = myfig.add_subplot(1,N,j)
-      M = 8*4096
+      M = 16*4096
       samps = xrange(np.size(self.samples['logL']))
       autocovariance = np.zeros((np.size(self.samples['logL']),M))
-      r = np.linspace(0.0,100000.0,M)
+      r = np.linspace(1.0,np.exp(21.),M)
       taus = self.samples['logTAU_'+singles.name]
       sigmas = self.samples['logSIGMA_'+singles.name]
       equads = self.samples['logEQUAD_'+singles.name]
@@ -399,13 +399,13 @@ class Posterior:
       ax.plot(frequency[0],np.percentile(psds,84.,axis=0),color='b')
       ax.plot(frequency[0],np.median(psds,axis=0),color='k')
       ax.axhline(1e-18*np.median(equads),color='g')
-      ax.axvline(1.0/365.0,color='k')
+      ax.axvline(1.0/31556926.,color='k')
       plt.yscale('log', nonposy='clip')
       plt.xscale('log')
-      plt.ylabel("$P(f)/[s^2 d]$")
-      plt.xlabel("$d^{-1}$")
+      plt.ylabel("$P(f)/[s^2 Hz^{-1}]$")
+      plt.xlabel("$\mathrm{Hz}$")
 #      plt.ylim(1e-20,1e-8)
-#      plt.xlim(1e-4,1.0)
+      plt.xlim(1./np.exp(20.),1.0)
       plt.grid(alpha=0.5)
       plt.title(r"$\mathrm{power}$ $\mathrm{spectral}$ $\mathrm{density}$ $\mathrm{%s}$"%singles.name, y=1.10)
       j+=1
@@ -589,7 +589,7 @@ if __name__=='__main__':
   myfig_pos.savefig(location+'/residuals.pdf',bbox_inches='tight')
   myfig_pos.clf()
   htmlfile.write('<tr><td><img src="residuals.png">')
-
+  exit()
   for n in posteriors.csv_names:
     myfig_pos=plt.figure(1)
     myfig_pos = posteriors.oneDpos(myfig_pos,n,WIDTH,nbins1D)
