@@ -269,7 +269,10 @@ class Posterior:
       mu, cov = self.gp[singles.name].predict(residuals,singles.toas()[i])
       full_residuals = residuals
       full_residuals_errors = (1e3*singles.toaerrs[i])
-      plt.errorbar(singles.toas()[i],full_residuals,yerr=full_residuals_errors,fmt='.',label=singles.name+" rms = %.3f ns"%np.sqrt(np.mean(full_residuals_errors**2)));
+      plt.errorbar(singles.toas()[i],full_residuals,yerr=full_residuals_errors,fmt='.',color='k',label="$"+singles.name+"$ $\mathrm{rms} = %.3f ns $"%np.sqrt(np.mean(full_residuals**2)));
+      singles.fit()
+      tempo_residuals = 1e9*singles.residuals(updatebats=True,formresiduals=True)[i]
+      plt.errorbar(singles.toas()[i],tempo_residuals,yerr=full_residuals_errors,fmt='.',color='r',label="$"+singles.name+"$ $\mathrm{rms} = %.3f ns (\mathrm{TEMPO2})$"%np.sqrt(np.mean(tempo_residuals**2)));
     plt.xlabel("$\mathrm{MJD}$",fontsize=18)
     plt.ylabel(r"$\mathrm{residuals}/\mathrm{ns}$",fontsize=18)
     plt.legend(loc='best')
@@ -293,7 +296,7 @@ class Posterior:
       for p in binaries:
         ax = myfig.add_subplot(1,N,j)
         i = np.argsort(p.toas())
-        tau = np.median(1e-9*self.samples['logTAU_'+p.name])
+        tau = np.median(self.samples['logTAU_'+p.name])
         sigma = np.median(1e-9*self.samples['logSIGMA_'+p.name])
         equad = np.median(1e-9*self.samples['logEQUAD_'+p.name])
         err = 1.0e3 * p.toaerrs # in ns
@@ -309,7 +312,7 @@ class Posterior:
         j+=1
     for singles in self.pulsars.pulsars['singles']:
       ax = myfig.add_subplot(1,N,j)
-      tau = np.median(1e-9*self.samples['logTAU_'+singles.name])
+      tau = np.median(self.samples['logTAU_'+singles.name])
       sigma = np.median(1e-9*self.samples['logSIGMA_'+singles.name])
       equad = np.median(1e-9*self.samples['logEQUAD_'+singles.name])
       for n in singles.pars:
@@ -348,7 +351,7 @@ class Posterior:
       for p in binaries:
         ax = myfig.add_subplot(1,N,j)
         i = np.argsort(p.toas())
-        tau = np.median(1e-9*self.samples['logTAU_'+p.name])
+        tau = np.median(self.samples['logTAU_'+p.name])
         sigma = np.median(1e-9*self.samples['logSIGMA_'+p.name])
         equad = np.median(1e-9*self.samples['logEQUAD_'+p.name])
         err = 1.0e3 * p.toaerrs # in ns
@@ -368,7 +371,7 @@ class Posterior:
       samps = xrange(np.size(self.samples['logL']))
       autocovariance = np.zeros((np.size(self.samples['logL']),M))
       r = np.linspace(0.0,100000.0,M)
-      taus = 1e-9*self.samples['logTAU_'+singles.name]
+      taus = self.samples['logTAU_'+singles.name]
       sigmas = self.samples['logSIGMA_'+singles.name]
       equads = self.samples['logEQUAD_'+singles.name]
       for i,tau,sigma,equad in zip(xrange(np.size(self.samples['logL'])),taus,sigmas,equads):
