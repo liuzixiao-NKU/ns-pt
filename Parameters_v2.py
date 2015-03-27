@@ -466,7 +466,7 @@ class Parameter(object):
                         if self.vary[name]!=0:
                             p[n].val = np.copy(self.values[name])
             for p in binaries:
-                tau = np.exp(self.values['logTAU_'+p.name])
+                tau = np.exp(self.values['logTAU_'+p.name])/86400.0 # we are translating it into days to be consistent with the toas units
                 sigma = np.exp(self.values['logSIGMA_'+p.name])
                 equad = np.exp(self.values['logEQUAD_'+p.name])[0]
                 kernel = kernels.WhiteKernel(equad*equad)+sigma * sigma * kernels.ExpSquaredKernel(tau*tau)
@@ -486,7 +486,7 @@ class Parameter(object):
                 name = n+"_"+singles.name
                 if self.vary[name]!=0:
                     singles[n].val = np.copy(self.values[name])
-            tau = np.exp(self.values['logTAU_'+singles.name])
+            tau = np.exp(self.values['logTAU_'+singles.name])/86400.0 # we are translating it into days to be consistent with the toas units
             sigma = np.exp(self.values['logSIGMA_'+singles.name])
             equad = np.exp(self.values['logEQUAD_'+singles.name])[0]
             kernel = kernels.WhiteKernel(equad*equad)+sigma * sigma * kernels.ExpSquaredKernel(tau*tau)

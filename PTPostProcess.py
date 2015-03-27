@@ -296,7 +296,7 @@ class Posterior:
       for p in binaries:
         ax = myfig.add_subplot(1,N,j)
         i = np.argsort(p.toas())
-        tau = np.median(self.samples['logTAU_'+p.name])
+        tau = np.median(self.samples['logTAU_'+p.name])/86400.0 # we are translating it in days to be consistent with the toas untis
         sigma = np.median(1e-9*self.samples['logSIGMA_'+p.name])
         equad = np.median(1e-9*self.samples['logEQUAD_'+p.name])
         err = 1.0e3 * p.toaerrs # in ns
@@ -312,7 +312,7 @@ class Posterior:
         j+=1
     for singles in self.pulsars.pulsars['singles']:
       ax = myfig.add_subplot(1,N,j)
-      tau = np.median(self.samples['logTAU_'+singles.name])
+      tau = np.median(self.samples['logTAU_'+singles.name])/86400.0 # we are translating it in days to be consistent with the toas untis
       sigma = np.median(1e-9*self.samples['logSIGMA_'+singles.name])
       equad = np.median(1e-9*self.samples['logEQUAD_'+singles.name])
       for n in singles.pars:
@@ -329,6 +329,7 @@ class Posterior:
       cb = plt.colorbar(mat, orientation='horizontal')
       ticks = cb.ax.get_yticklabels()
       cb.ax.set_yticklabels(ticks, rotation=45.0)
+      cb.set_label(r"$\mathrm{d}^2$")
       j+=1
 
     return myfig
@@ -351,7 +352,7 @@ class Posterior:
       for p in binaries:
         ax = myfig.add_subplot(1,N,j)
         i = np.argsort(p.toas())
-        tau = np.median(self.samples['logTAU_'+p.name])
+        tau = np.median(self.samples['logTAU_'+p.name])/86400.0 # we are translating it in days to be consistent with the toas untis
         sigma = np.median(1e-9*self.samples['logSIGMA_'+p.name])
         equad = np.median(1e-9*self.samples['logEQUAD_'+p.name])
         err = 1.0e3 * p.toaerrs # in ns
@@ -370,46 +371,40 @@ class Posterior:
       M = 16*4096
       samps = xrange(np.size(self.samples['logL']))
       autocovariance = np.zeros((np.size(self.samples['logL']),M))
-      r = np.linspace(1.0,np.exp(21.),M)
-      taus = self.samples['logTAU_'+singles.name]
+      r = np.linspace(1.0/86400.0 ,np.exp(21.)/86400.0 ,M)
+      taus = self.samples['logTAU_'+singles.name]/86400.0 # we are translating it in days to be consistent with the toas untis
       sigmas = self.samples['logSIGMA_'+singles.name]
       equads = self.samples['logEQUAD_'+singles.name]
       for i,tau,sigma,equad in zip(xrange(np.size(self.samples['logL'])),taus,sigmas,equads):
-          autocovariance[i,:] = (sigma *sigma * np.exp(-0.5*(r/tau)**2)+equad)
-#      ax.semilogy(r,mean_acf,color='k')
-#      ax.semilogy(r,up_acf,color='r')
-#      ax.semilogy(r,down_acf,color='g')
-#      for i in samps:
-#        ax.semilogy(r,autocovariance[i,:],color='k',linewidth=0.5,alpha=0.5)
+          autocovariance[i,:] = (sigma *sigma * np.exp(-0.5*(r/tau)**2))
+          autocovariance[i,0] += equad
       colors = ['r','b','k','b','r']
       frequency = []
       psds = []
       for i in xrange(np.size(self.samples['logL'])):
         frequency.append(np.fft.rfftfreq(np.size(autocovariance[i,:]),np.diff(r)[0]))
-        psds.append(1e-18*(np.fft.rfft(autocovariance[i,:]).real))#+1e-12*np.mean(singles.toaerrs**2))
-#      for i in xrange(np.size(self.samples['logL'])):
-##        if c=='k':
-#        ax.plot(frequency[i],psds[i],color='0.9',alpha=0.5)
-#        ax.plot(f,psd+1e-18*equads[i],color=c,linestyle='--')
-#ax.fill_between(frequency[0],np.percentile(psds,2.5,axis=0),np.percentile(psds,97.5,axis=0),facecolor='r',alpha=0.5)
-      #ax.fill_between(frequency[0],np.percentile(psds,16.,axis=0),np.percentile(psds,84.,axis=0),facecolor='b',alpha=0.5)
+        psds.append(1e-18*(np.fft.rfft(autocovariance[i,:]).real))
+      ax.fill_between(frequency[0],np.percentile(psds,97.5,axis=0),np.percentile(psds,2.5,axis=0),facecolor='r',alpha=0.5)
+      ax.fill_between(frequency[0],np.percentile(psds,84.,axis=0),np.percentile(psds,16.,axis=0),facecolor='b',alpha=0.5)
       ax.plot(frequency[0],np.percentile(psds,2.5,axis=0),color='r')
       ax.plot(frequency[0],np.percentile(psds,97.5,axis=0),color='r')
       ax.plot(frequency[0],np.percentile(psds,16.,axis=0),color='b')
       ax.plot(frequency[0],np.percentile(psds,84.,axis=0),color='b')
+#      ax.plot(frequency[0],np.percentile(psds,1.5,axis=0),color='g')
+#      ax.plot(frequency[0],np.percentile(psds,98.5,axis=0),color='g')
       ax.plot(frequency[0],np.median(psds,axis=0),color='k')
-      ax.axhline(1e-18*np.median(equads),color='g')
-      ax.axvline(1.0/31556926.,color='k')
+      #ax.axhline(1e-18*np.median(equads),color='g')
+      ax.axvline(1.0/365.,color='k')#31556926.
       plt.yscale('log', nonposy='clip')
       plt.xscale('log')
-      plt.ylabel("$P(f)/[s^2 Hz^{-1}]$")
-      plt.xlabel("$\mathrm{Hz}$")
+      plt.ylabel("$P(f)/[s^2 d]$")
+      plt.xlabel("$\mathrm{d}^{-1}$")
 #      plt.ylim(1e-20,1e-8)
-      plt.xlim(1./np.exp(20.),1.0)
-      plt.grid(alpha=0.5)
+#      plt.xlim(1./np.exp(21.),0.5/M)
+#      plt.grid(alpha=0.5)
       plt.title(r"$\mathrm{power}$ $\mathrm{spectral}$ $\mathrm{density}$ $\mathrm{%s}$"%singles.name, y=1.10)
       j+=1
-
+          # plot hc(f) = sqrt(12 pi**2 f**3 psd(f))
     return myfig
 
 def find_nearest(array,value):
