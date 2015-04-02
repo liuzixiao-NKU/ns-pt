@@ -154,6 +154,7 @@ class Posterior:
         except:
           sys.stderr.write("DPGMM fit failed!\n")
     ax.bar(bincenters,n,width=0.9*diff(bincenters)[0],color="0.5",alpha=0.25,edgecolor='white')
+    ax.axvline(injection,color='k',linestyle="--",alpha=0.5)
     x = bincenters[find_nearest(p,0.025):find_nearest(p,0.975)+1]
     px=n[find_nearest(p,0.025):find_nearest(p,0.975)+1]
     ax.bar(x,px,width=0.9*diff(bincenters)[0],color="0.5",alpha=0.5,edgecolor='white')
@@ -267,7 +268,6 @@ class Posterior:
       for p in binaries:
         i = np.argsort(p.toas())
         residuals = 1e9*p.residuals(updatebats=True,formresiduals=True)[i]
-#        ax.plot(p.toas()[i],self.gp[p.name].sample_conditional(residuals[i], p.toas()[i]))
         ax.errorbar(p.toas()[i],residuals,yerr=1e3*p.toaerrs[i],fmt='.',label=p.name+" rms = %.3f ns"%np.sqrt(np.mean(residuals**2)));
 
     for singles in self.pulsars.pulsars['singles']:
