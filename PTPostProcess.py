@@ -64,10 +64,10 @@ def set_tick_sizes(ax, major, minor):
 maxStick=16
 
 class Posterior:
-  def __init__(self,data_file,evidence_file,pulsars=None,dpgmm=0):
+  def __init__(self,data_file,evidence_file,pulsars=None,dpgmm=0,noisemodel=None):
     
     data=np.genfromtxt(data_file,skip_header=1)
-    f = open(data_file,'r') #"double_pulsar/whitenoise/prior/free/header.txt" data_file
+    f = open(data_file,'r')
     self.csv_names = f.readline().split(None)
     f.close()
     self.samples= data.view(dtype=[(n, 'float64') for n in self.csv_names]).reshape(len(data))
@@ -266,7 +266,6 @@ class Posterior:
         singles[n].val = np.copy(np.median(self.samples[name]))
       i = np.argsort(singles.toas())
       residuals = 1e9*singles.residuals(updatebats=True,formresiduals=True)[i]
-      mu, cov = self.gp[singles.name].predict(residuals,singles.toas()[i])
       full_residuals = residuals
       full_residuals_errors = (1e3*singles.toaerrs[i])
       plt.errorbar(singles.toas()[i],full_residuals,yerr=full_residuals_errors,fmt='.',color='k',label="$"+singles.name+"$ $\mathrm{rms} = %.3f ns $"%np.sqrt(np.mean(full_residuals**2)));
@@ -368,16 +367,24 @@ class Posterior:
         j+=1
     for singles in self.pulsars.pulsars['singles']:
       ax = myfig.add_subplot(1,N,j)
-      M = 16*4096
       samps = xrange(np.size(self.samples['logL']))
+      # set the observation time in days
+      T = (np.max(singles.toas())-np.min(singles.toas()))*86400.0#10.*365.
+      # the number of samples
+      M = 4096*16
       autocovariance = np.zeros((np.size(self.samples['logL']),M))
-      r = np.linspace(1.0/86400.0 ,np.exp(21.)/86400.0 ,M)
-      taus = self.samples['logTAU_'+singles.name]/86400.0 # we are translating it in days to be consistent with the toas untis
+      # generate the times array from 0 lag to a max lag equal to the observation time
+      #r = np.linspace(0.0,T,M)
+      r = np.linspace(0.0 ,10*T ,M)
+      taus = self.samples['logTAU_'+singles.name] # we are translating it in days to be consistent with the toas units
       sigmas = self.samples['logSIGMA_'+singles.name]
       equads = self.samples['logEQUAD_'+singles.name]
       for i,tau,sigma,equad in zip(xrange(np.size(self.samples['logL'])),taus,sigmas,equads):
-          autocovariance[i,:] = (sigma *sigma * np.exp(-0.5*(r/tau)**2))
+          autocovariance[i,:] = sigma *sigma * np.exp(-0.5*(r/tau)**2)
           autocovariance[i,0] += equad
+#      ax.plot(r,autocovariance[1,:])
+#      plt.show()
+#      exit()
       colors = ['r','b','k','b','r']
       frequency = []
       psds = []
@@ -390,21 +397,25 @@ class Posterior:
       ax.plot(frequency[0],np.percentile(psds,97.5,axis=0),color='r')
       ax.plot(frequency[0],np.percentile(psds,16.,axis=0),color='b')
       ax.plot(frequency[0],np.percentile(psds,84.,axis=0),color='b')
-#      ax.plot(frequency[0],np.percentile(psds,1.5,axis=0),color='g')
-#      ax.plot(frequency[0],np.percentile(psds,98.5,axis=0),color='g')
       ax.plot(frequency[0],np.median(psds,axis=0),color='k')
-      #ax.axhline(1e-18*np.median(equads),color='g')
-      ax.axvline(1.0/365.,color='k')#31556926.
-      plt.yscale('log', nonposy='clip')
-      plt.xscale('log')
-      plt.ylabel("$P(f)/[s^2 d]$")
-      plt.xlabel("$\mathrm{d}^{-1}$")
-#      plt.ylim(1e-20,1e-8)
-#      plt.xlim(1./np.exp(21.),0.5/M)
-#      plt.grid(alpha=0.5)
+      ax.grid(alpha=0.5)
+      ax.axvline(1.0/31556926.,color='k')#31556926.
+      ax.axvline(1.0/T,color='k',linestyle="--")#31556926.
+      ax.set_yscale('log', nonposy='clip')
+      ax.set_xscale('log')
+      ax.set_ylabel("$S(f)/[s^2 \mathrm{Hz}^{-1}]$")
+      ax.set_xlabel("$\mathrm{Hz}$")
       plt.title(r"$\mathrm{power}$ $\mathrm{spectral}$ $\mathrm{density}$ $\mathrm{%s}$"%singles.name, y=1.10)
       j+=1
-          # plot hc(f) = sqrt(12 pi**2 f**3 psd(f))
+      hc = [np.sqrt(12.0*(np.pi**2)*(frequency[0]**3)*psd) for psd in psds]
+      ax2 = ax.twinx()
+      ax2.plot(frequency[0],np.percentile(hc,2.5,axis=0),color='r',linestyle="--")
+      ax2.plot(frequency[0],np.percentile(hc,97.5,axis=0),color='r',linestyle="--")
+      ax2.plot(frequency[0],np.percentile(hc,16.,axis=0),color='b',linestyle="--")
+      ax2.plot(frequency[0],np.percentile(hc,84.,axis=0),color='b',linestyle="--")
+      ax2.plot(frequency[0],np.median(hc,axis=0),color='k',linestyle="--")
+      ax2.set_yscale('log', nonposy='clip')
+      ax2.set_ylabel("$h_c(f)$")
     return myfig
 
 def find_nearest(array,value):
@@ -584,7 +595,7 @@ if __name__=='__main__':
   myfig_pos.savefig(location+'/residuals.pdf',bbox_inches='tight')
   myfig_pos.clf()
   htmlfile.write('<tr><td><img src="residuals.png">')
-  exit()
+
   for n in posteriors.csv_names:
     myfig_pos=plt.figure(1)
     myfig_pos = posteriors.oneDpos(myfig_pos,n,WIDTH,nbins1D)
