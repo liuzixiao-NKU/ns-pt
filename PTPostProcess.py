@@ -79,6 +79,31 @@ class Posterior:
     self.pulsars = Parameter(pulsars,model='Free')
     self.dpgmm = dpgmm
     self.gp = {}
+    self.injections = self.getInjectionValues()
+
+  def getInjectionValues(self):
+    injections = {}
+    for binaries in self.pulsars.pulsars['binaries']:
+        injections[binaries.name] = {}
+        for n in self.csv_names:
+            if n!='logL':
+                pname = n.split('_')[0]
+                try:
+                    injections[binaries.name][pname] = binaries[binaries.name].prefit[pname].val
+                except:
+                    injections[binaries.name][pname] = None
+
+    for singles in self.pulsars.pulsars['singles']:
+        injections[singles.name] = {}
+        for n in self.csv_names:
+            if n!='logL':
+                pname=n.split('_')[0]
+                try:
+                    injections[singles.name][pname] = singles.prefit[pname].val
+                except:
+                    injections[singles.name][pname] = None
+    return injections
+
   def oneDpos(self,fig,name,width,nbins):
     n, bins = np.histogram(self.samples[name], bins=linspace(np.min(self.samples[name]),np.max(self.samples[name]),nbins), normed=True)
     db = bins[1]-bins[0]
@@ -93,18 +118,11 @@ class Posterior:
     # transform the samples in standard format
     m = np.mean(self.samples[name])
     s = np.std(self.samples[name])
-    #if (self.pulsars!=None) and (name!='GOB' and name!='XI' and name!='EPS' and name!='KAPPA' and 'TAU' not in name and 'SIGMA' not in name):
-      #fields = name.split('_')
-      #if fields[-1]=='PSR':
-        #injection = self.pulsars.pulsars['binaries'][0][0].prefit[str(fields[0])].val
-      #elif fields[-1]=='PSRA':
-        #injection = self.pulsars.pulsars['binaries'][0][0].prefit[str(fields[0])].val
-      #elif fields[-1]=='PSRB':
-        #injection = self.pulsars.pulsars['binaries'][0][1].prefit[str(fields[0])].val
-      #elif self.pulsars.pulsars['singles']!=None and fields[0]!='logL':
-        #injection = self.pulsars.pulsars['singles'][0].prefit[str(fields[0])].val
-      #else:
-    injection = None
+    if name!='logL' and name!='GOB' and name!='XI' and name!='EPS' and name!='KAPPA':
+        nam,psrname = name.split('_')
+        injection = self.injections[psrname][nam]
+    else:
+        injection = None
     if self.dpgmm:
       model = DPGMM(1)
       if s > 0.0:
@@ -141,10 +159,6 @@ class Posterior:
     ax.bar(x,px,width=0.9*diff(bincenters)[0],color="0.5",alpha=0.5,edgecolor='white')
     ax.axvline(low,linewidth=2, color='r',linestyle="--",alpha=0.5)
     ax.axvline(high,linewidth=2, color='r',linestyle="--",alpha=0.5)
-    if (self.pulsars!=None) and (name!='GOB' and name!='XI' and name!='EPS' and name!='KAPPA' and 'TAU' not in name and 'SIGMA' not in name):
-      ax.axvline(injection,linewidth=2, color='k',linestyle="--",alpha=0.5)
-    #    axvline((self.injections[index]-self.tempo2values[index])/self.errors[index],linewidth=2, color='r',linestyle="--",alpha=0.5)
-    #plt.xticks(linspace(-width,width,11),rotation=45.0)
     majorFormatterX = FormatStrFormatter('%.15f')
     majorFormatterY = FormatStrFormatter('%.15f')
     ax.xaxis.set_major_formatter(majorFormatterX)
@@ -157,22 +171,17 @@ class Posterior:
   
   def twoDpos(self,name1,name2,width,nbins):
     from matplotlib.colors import LogNorm
-    if (self.pulsars!=None) and (name1!='GOB' and name1!='XI' and name1!='EPS' and name1!='KAPPA' and name2!='GOB' and name2!='XI' and name2!='EPS' and name2!='KAPPA'):
-      
-      fields1 = name1.split('_')
-      fields2 = name2.split('_')
-      if (fields1[-1]=='PSR' and fields2[-1]=='PSR') or (fields1[-1]=='PSR' and fields2[-1]=='PSRA') or (fields1[-1]=='PSRA' and fields2[-1]=='PSR') or (fields1[-1]=='PSRA' and fields2[-1]=='PSRA'):
-        injection = [self.pulsars.pulsars['binaries'][0][0].prefit[str(fields1[0])].val,self.pulsars.pulsars['binaries'][0][0].prefit[str(fields2[0])].val]
-      elif (fields1[-1]=='PSR' and fields2[-1]=='PSRB') or (fields1[-1]=='PSRB' and fields2[-1]=='PSRB'):
-        injection = [self.pulsars.pulsars['binaries'][0][1].prefit[str(fields1[0])].val,self.pulsars.pulsars['binaries'][0][1].prefit[str(fields2[0])].val]
-      elif (fields1[-1]=='PSRB' and fields2[-1]=='PSR') or (fields1[-1]=='PSRB' and fields2[-1]=='PSRA'):
-        injection = [self.pulsars.pulsars['binaries'][0][1].prefit[str(fields1[0])].val,self.pulsars.pulsars['binaries'][0][0].prefit[str(fields2[0])].val]
-      elif (fields1[-1]=='PSRA' and fields2[-1]=='PSRB'):
-        injection = [self.pulsars.pulsars['binaries'][0][0].prefit[str(fields1[0])].val,self.pulsars.pulsars['binaries'][0][1].prefit[str(fields2[0])].val]
-      elif self.pulsars.pulsars['singles']!=None and fields1[0]!='logL' and fields2[0]!='logL' and 'logTAU' not in fields1[0] and 'logSIGMA' not in fields1[0] and 'logTAU' not in fields2[0] and 'logSIGMA' not in fields2[0]:
-          injection = [self.pulsars.pulsars['singles'][0].prefit[str(fields1[0])].val,self.pulsars.pulsars['singles'][0].prefit[str(fields2[0])].val]
-      else:
-        injection = None
+    if name1!='logL' and name1!='GOB' and name1!='XI' and name1!='EPS' and name1!='KAPPA' and name1!='logL' and name2!='GOB' and name2!='XI' and name2!='EPS' and name2!='KAPPA':
+        try:
+            nam1,psrname1 = name1.split('_')
+            nam2,psrname2 = name2.split('_')
+            injection1,injection2 = self.injections[psrname1][nam1],self.injections[psrname2][nam2]
+        except:
+            injection1 = None
+            injection2 = None
+    else:
+        injection1 = None
+        injection2 = None
     sys.stderr.write("plotting "+name1+" vs "+name2+"\n")
     m1 = np.mean(self.samples[name1])
     s1 = np.std(self.samples[name1])
@@ -227,9 +236,9 @@ class Posterior:
       elif (plotME==1):
         levels = FindHeightForLevel(np.log(myhist),[0.68,0.95,0.99])#[0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9])#
         C = ax.contour(np.log(myhist).T,levels,linestyles='-',colors='k',linewidths=1.5, hold='on',origin='lower',extent=[np.min(xplot),np.max(xplot),np.min(yplot),np.max(yplot)])
-      if (self.pulsars!=None) and (name1!='GOB' and name1!='XI' and name1!='EPS' and name1!='KAPPA' and name2!='GOB' and name2!='XI' and name2!='EPS' and name2!='KAPPA' and 'logTAU' not in name1 and 'logSIGMA' not in name1 and 'logTAU' not in name2 and 'logSIGMA' not in name2 and 'logL' not in name1 and 'logL' not in name2):
-        ax.axvline((injection[0]-m1)/s1,linewidth=2, color='k',linestyle="--",alpha=0.5)
-        ax.axhline((injection[1]-m2)/s2,linewidth=2, color='k',linestyle="--",alpha=0.5)
+      if injection1!=None and injection2!=None:
+        ax.axvline((injection1-m1)/s1,linewidth=2, color='k',linestyle="--",alpha=0.5)
+        ax.axhline((injection2-m2)/s2,linewidth=2, color='k',linestyle="--",alpha=0.5)
       majorFormatterX = FormatStrFormatter('%.15f')
       majorFormatterY = FormatStrFormatter('%.15f')
       ax.xaxis.set_major_formatter(majorFormatterX)
@@ -244,7 +253,7 @@ class Posterior:
 
   def plotresiduals(self):
     myfig=plt.figure(1)
-    ax = plt.axes([0.125,0.2,0.95-0.125,0.95-0.2])
+    ax = myfig.add_subplot(1,1,1)
     for binaries in self.pulsars.pulsars['binaries']:
       for n in binaries[0].pars:
         if binaries[0].prefit[n].val == binaries[1].prefit[n].val:
@@ -383,9 +392,6 @@ class Posterior:
       for i,tau,sigma,equad in zip(xrange(np.size(self.samples['logL'])),taus,sigmas,equads):
           autocovariance[i,:] = sigma *sigma * np.exp(-0.5*(r/tau)**2)
           autocovariance[i,0] += equad
-#      ax.plot(r,autocovariance[1,:])
-#      plt.show()
-#      exit()
       colors = ['r','b','k','b','r']
       frequency = []
       psds = []
@@ -404,6 +410,7 @@ class Posterior:
       ax.axvline(1.0/T,color='k',linestyle="--")#31556926.
       ax.set_yscale('log', nonposy='clip')
       ax.set_xscale('log')
+      ax.set_xlim([1.0/np.max(r),M/2])
       ax.set_ylabel("$S(f)/[s^2 \mathrm{Hz}^{-1}]$")
       ax.set_xlabel("$\mathrm{Hz}$")
       plt.title(r"$\mathrm{power}$ $\mathrm{spectral}$ $\mathrm{density}$ $\mathrm{%s}$"%singles.name, y=1.10)
@@ -489,12 +496,6 @@ def parse_to_list(option, opt, value, parser):
 
 # parse arguments
 if __name__=='__main__':
-#  parfiles =["/projects/pulsar_timing/nested_sampling/pulsar_a_nongr.par","/projects/pulsar_timing/nested_sampling/pulsar_b_nongr.par"]
-#  timfiles =["/projects/pulsar_timing/nested_sampling/pulsar_a_nongr.simulate","/projects/pulsar_timing/nested_sampling/pulsar_b_nongr.simulate"]
-#  parfiles =["/projects/pulsar_timing/nested_sampling/pulsar_a.par","/projects/pulsar_timing/nested_sampling/pulsar_b.par"]
-#  timfiles =["/projects/pulsar_timing/nested_sampling/pulsar_a.simulate","/projects/pulsar_timing/nested_sampling/pulsar_b.simulate"]
-#  psrA = T.tempopulsar(parfile = parfiles[0], timfile = timfiles[0])
-#  psrB = T.tempopulsar(parfile = parfiles[1], timfile = timfiles[1])
   parser = op.OptionParser()
   parser.add_option("-i", "--input", type="string", dest="input", help="Input file")
   parser.add_option("-e", "--evidence", type="string", dest="evidence", help="Evidence file")
