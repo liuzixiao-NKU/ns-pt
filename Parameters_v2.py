@@ -11,7 +11,7 @@ par_names = ['RAJ','DECJ','F0_0','F1_0','F0_1','F1_1','DM','PMRA','PMDEC','PX','
 par_formats = [np.float128,np.float128,np.float128,np.float128,np.float128,np.float128,np.float128,np.float128,np.float128,np.float128,np.float128,np.float128,np.float128,np.float128,np.float128,np.float128,np.float128,np.float128,np.float128,np.float128,np.float128,np.float128,np.float128,np.float128,np.float128,np.float128,np.float128,np.float128]
 vary_formats = [np.int,np.int,np.int,np.int,np.int,np.int,np.int,np.int,np.int,np.int,np.int,np.int,np.int,np.int,np.int,np.int,np.int,np.int,np.int,np.int,np.int,np.int,np.int,np.int,np.int,np.int,np.int,np.int]
 
-width = 5.
+width = 10.
 
 def computeLogLinj(pulsars):
 	"""
@@ -207,10 +207,14 @@ class Parameter(object):
                     for p in binaries:
                         a = p[n].val-width*p[n].err
                         b = p[n].val+width*p[n].err
-                        self.values[n+'_'+p.name] = binaries[0].prefit[n].val
+                        self.values[n+'_'+p.name] = p.prefit[n].val
                         if n=='M2':
                             a = np.maximum(0.1,a)
                             b = np.minimum(10.0,b)
+                            if self.model=='GR' or self.model=='CG':
+                                a = np.maximum(1.2,a)
+                                b = np.minimum(1.4,b)
+                            self.vary[n+'_'+p.name] = 1
                         if n=='GAMMA':
                             a = np.maximum(0.0,a)
                         self.bounds[n+'_'+p.name] = [a,b]
@@ -220,15 +224,14 @@ class Parameter(object):
                                 self.vary[n+'_'+p.name] = -1
             if 'OM_'+binaries[0].name in self.par_names: self.vary['OM_'+binaries[1].name] = -1
             if self.model=='CG':
-                self.bounds['GOB'] = [0.95,1.05]
-                self.bounds['EPS'] = [2.95,3.05]
-                self.bounds['XI'] = [0.95,1.05]
-                self.bounds['KAPPA'] = [-0.05,0.05]
+                self.bounds['GOB'] = [0.9,1.1]
+                self.bounds['EPS'] = [2.9,3.1]
+                self.bounds['XI'] = [0.9,1.1]
+                self.bounds['KAPPA'] = [-0.1,0.1]
                 self.vary['KAPPA'] = 1
                 self.vary['GOB'] = 1
                 self.vary['EPS'] = 1
                 self.vary['XI'] = 1
-
         # now let's add the single pulsars parameters
         for singles in self.pulsars['singles']:
             if self.noisemodel=="white" or self.noisemodel=="red":
@@ -257,7 +260,6 @@ class Parameter(object):
                 self.bounds[n+'_'+singles.name] = [a,b]
                 self.vary[n+'_'+singles.name] = singles[n].fit
 
-
     def inbounds(self):
         """
         Checks whether the values of the parameters are in bound
@@ -267,14 +269,10 @@ class Parameter(object):
                 if (self.values[n] < self.bounds[n][0] or self.values[n] > self.bounds[n][1]):
                     return False
         self.constraint()
-        try:
-            if self.values['SINI_PSR']>1.0: return False
-        except:
-            pass
-        #    for n in self.values.dtype.names:
-        #      if (self.vary[n]==-1):
-        #        if (self.values[n] < self.bounds[n][0] or self.values[n] > self.bounds[n][1]):
-        #          return False
+        for n in self.values.dtype.names:
+          if (self.vary[n]==-1):
+            if (self.values[n] < self.bounds[n][0] or self.values[n] > self.bounds[n][1]):
+              return False
         return True
 
     def map(self):
@@ -283,7 +281,6 @@ class Parameter(object):
         """
         for name in self.par_names:
             if (self.vary[name]==1):
-        #        self.values[name] = self.bounds[name][0]+self._internalvalues[name]*(self.bounds[name][1]-self.bounds[name][0])
                 self.values[name] = 0.5*(self._internalvalues[name]+1.0)*(self.bounds[name][1]-self.bounds[name][0])+self.bounds[name][0]
 
     def invmap(self):
@@ -301,32 +298,33 @@ class Parameter(object):
         for binaries in self.pulsars['binaries']:
             if 'OM_'+binaries[0].name in self.par_names:
                 self.values['OM_'+binaries[1].name] = self.values['OM_'+binaries[0].name]+180.
+            
             if self.model!="Free":
-                m1 = self.values['M2_'+binaries[1].name]
-                m2 = self.values['M2_'+binaries[0].name]
-                pb = self.values['PB_'+binaries[0].name[:-1]]
-                a1 = self.values['A1_'+binaries[0].name]
-                a2 = self.values['A1_'+binaries[1].name]
-                ecc = self.values['ECC_'+binaries[0].name[:-1]]
-            if self.model=='GR':
-                self.values['GAMMA_'+binaries[0].name] = gamma(pb,ecc,m1,m2)
-                self.values['GAMMA_'+binaries[1].name] = gamma(pb,ecc,m2,m1)
-                self.values['PBDOT_'+binaries[0].name[:-1]] = pbdot(pb,ecc,m1,m2)
-                self.values['OMDOT_'+binaries[0].name[:-1]] = omega_dot(pb,ecc,m1,m2)
-                self.values['SINI_'+binaries[0].name[:-1]] = shapiroS(pb,m1,m2,a1)
-                #sys.stderr.write('pb: %.30f m1: %.30f m2: %.30f a1: %.30f sini: %.30f\n'%(pb,m1,m2,a1,self.values['SINI_'+binaries[0].name[:-1]]))
-            elif self.model=='CG':
-                gob = self.values['GOB']
-                xi = self.values['XI']
-                eps = self.values['EPS']
-                kappa = self.values['KAPPA']
-                mtot = m1+m2
-                beta = beta0(pb,mtot,gob)
-                self.values['GAMMA_'+binaries[0].name] = gammaAG(pb,m2/mtot,gob,kappa,beta,ecc)
-                self.values['GAMMA_'+binaries[1].name] = gammaAG(pb,m1/mtot,gob,kappa,beta,ecc)
-                self.values['OMDOT_'+binaries[0].name[:-1]] = omdotAG(pb,eps,xi,beta,ecc)
-                self.values['SINI_'+binaries[0].name[:-1]] = shapiroSAG(pb,a1,m2/mtot,beta)
-
+                if 'M2_'+binaries[1].name in self.values.dtype.names: m1 = self.values['M2_'+binaries[1].name]
+                if 'M2_'+binaries[1].name in self.values.dtype.names: m2 = self.values['M2_'+binaries[0].name]
+                if 'PB_'+binaries[0].name[:-1] in self.values.dtype.names: pb = self.values['PB_'+binaries[0].name[:-1]]
+                if 'A1_'+binaries[0].name in self.values.dtype.names: a1 = self.values['A1_'+binaries[0].name]
+                if 'A1_'+binaries[1].name in self.values.dtype.names: a2 = self.values['A1_'+binaries[1].name]
+                if 'ECC_'+binaries[0].name[:-1] in self.values.dtype.names: ecc = self.values['ECC_'+binaries[0].name[:-1]]
+                if self.model=='GR':
+                    if 'm1' in locals() and 'm2' in locals() and 'ecc' in locals() and 'pb' in locals():
+                        self.values['GAMMA_'+binaries[0].name] = gamma(pb,ecc,m1,m2)
+                        self.values['GAMMA_'+binaries[1].name] = gamma(pb,ecc,m2,m1)
+                        self.values['PBDOT_'+binaries[0].name[:-1]] = pbdot(pb,ecc,m1,m2)
+                        self.values['OMDOT_'+binaries[0].name[:-1]] = omega_dot(pb,ecc,m1,m2)
+                        self.values['SINI_'+binaries[0].name[:-1]] = shapiroS(pb,m1,m2,a1)
+                elif self.model=='CG':
+                    gob = self.values['GOB']
+                    xi = self.values['XI']
+                    eps = self.values['EPS']
+                    kappa = self.values['KAPPA']
+                    if 'm1' in locals() and 'm2' in locals() and 'ecc' in locals() and 'pb' in locals():
+                        mtot = m1+m2
+                        beta = beta0(pb,mtot,gob)
+                        self.values['GAMMA_'+binaries[0].name] = gammaAG(pb,m2/mtot,gob,kappa,beta,ecc)
+                        self.values['GAMMA_'+binaries[1].name] = gammaAG(pb,m1/mtot,gob,kappa,beta,ecc)
+                        self.values['OMDOT_'+binaries[0].name[:-1]] = omdotAG(pb,eps,xi,beta,ecc)
+                        self.values['SINI_'+binaries[0].name[:-1]] = shapiroSAG(pb,a1,m2/mtot,beta)
     def logPrior(self):
         """
         Prior function
@@ -335,14 +333,15 @@ class Parameter(object):
         if self.inbounds():
             self.logP = 0.0
             for n in self.par_names:
+                if 'MC' in n:
+                    for binaries in self.pulsars['binaries']:
+                        m1 = self.values['M2_'+binaries[1].name]
+                        m2 = self.values['M2_'+binaries[0].name]
+                        self.logP+=np.log(m1*m1/self.values[n])
                 if 'PX' in n:
                     self.logP+=-np.log(self.values[n])
                 if 'DM' in n[:2] and 'DM1' not in n and 'DM2' not in n:
                     self.logP+=-np.log(self.values[n])
-        #        if 'TAU' in n:
-        #          self.logP+=-np.log(self.values[n])
-        #        if 'SIGMA' in n:
-        #          self.logP+=-np.log(self.values[n])
         else:
             self.logP = -np.inf
         return self.logP

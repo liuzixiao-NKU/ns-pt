@@ -84,14 +84,15 @@ class Posterior:
   def getInjectionValues(self):
     injections = {}
     for binaries in self.pulsars.pulsars['binaries']:
-        injections[binaries.name] = {}
-        for n in self.csv_names:
-            if n!='logL':
-                pname = n.split('_')[0]
-                try:
-                    injections[binaries.name][pname] = binaries[binaries.name].prefit[pname].val
-                except:
-                    injections[binaries.name][pname] = None
+        for p in binaries:
+            injections[p.name] = {}
+            for n in self.csv_names:
+                if n!='logL':
+                    pname = n.split('_')[0]
+                    try:
+                        injections[p.name][pname] = p.prefit[pname].val
+                    except:
+                        injections[p.name][pname] = None
 
     for singles in self.pulsars.pulsars['singles']:
         injections[singles.name] = {}
@@ -120,6 +121,8 @@ class Posterior:
     s = np.std(self.samples[name])
     if name!='logL' and name!='GOB' and name!='XI' and name!='EPS' and name!='KAPPA':
         nam,psrname = name.split('_')
+        if len(psrname)==3:
+            psrname = "PSRA"
         injection = self.injections[psrname][nam]
     else:
         injection = None
@@ -618,4 +621,3 @@ if __name__=='__main__':
           htmlfile.write('<br />')
   htmlfile.write('</BODY></HTML>')
   htmlfile.close()
-  exit()

@@ -13,6 +13,21 @@ GM = 1.3271243999e20
 SYEAR = 31558149.7676
 T0 = GM/C**3.# 4.925490947e-6 # sec
 
+def ms2mcq(m1,m2):
+    q = m2/m1
+    mc = (m1+m2)*pow(m1*m2/(m1+m2)**2,3./5.)
+    return mc,q
+
+def q2ms(mc,q):
+    factor = mc * np.power(1+q, 1.0/5.0);
+    m1 = factor * np.power(q, -3.0/5.0);
+    m2 = factor * np.power(q, 2.0/5.0);
+    return (m1,m2)
+#    if np.random.uniform(0.0,1.0) <= 0.5:
+#        return (m1,m2)
+#    else:
+#        return (m2,m1)
+
 def omega_dot(pb,ecc,mp,mc):
     # convert pb in sec
     pb = pb*86400.
@@ -113,7 +128,7 @@ if __name__ == '__main__':
     m2 = injectionsA[paramnamesA.index("M2")]
     mtot = m1+m2
     pb = injectionsA[paramnamesA.index("PB")]
-    GOB = 1.005
+    GOB = 1.05
     GEFF = GOB*G
     beta = beta0(pb,mtot,GOB)
     ecc = injectionsA[paramnamesA.index("ECC")]
