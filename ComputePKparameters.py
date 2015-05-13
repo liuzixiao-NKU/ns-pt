@@ -4,7 +4,7 @@ import numpy as np
 from math import pow
 from scipy.special import cbrt
 import optparse as op
-
+import libstempo as T
 
 C = 299792458.0 # m/s
 G = 6.67e-11 # SI m^3 kg^-1 s^-2
@@ -117,21 +117,21 @@ def semimaxjoraxis(pb,mp,mc):
     pb = pb*86400.
     mu = mp*mc/(mp+mc)
     mtot = mp+mc
-    a = cbrt(mtot*GM*pb*pb/(4.0*np.pi*np.pi))/C
+    a = pow(mtot*GM*pb*pb/(4.0*np.pi*np.pi),1./3.)/C
     return a/(1.+mp/mc)
 
 if __name__ == '__main__':
-    paramnamesA,injectionsA,errorsA=read_param_names("/projects/pulsar_timing/nested_sampling/prefit_PSRA.par")
-    paramnamesB,injectionsB,errorsB=read_param_names("/projects/pulsar_timing/nested_sampling/prefit_PSRB.par")
-    si = 0.997
-    m1 = injectionsB[paramnamesB.index("M2")]
-    m2 = injectionsA[paramnamesA.index("M2")]
+    pA = T.tempopulsar(parfile = "pulsar_1_zero_noise.par", timfile = "pulsar_a_zero_noise.simulate")
+    pB = T.tempopulsar(parfile = "pulsar_2_zero_noise.par", timfile = "pulsar_b_zero_noise.simulate")
+    si = 0.99
+    m1 = pB.prefit["M2"].val
+    m2 = pA.prefit["M2"].val
     mtot = m1+m2
-    pb = injectionsA[paramnamesA.index("PB")]
-    GOB = 1.05
+    pb =  pA.prefit["PB"].val
+    GOB = 1.00
     GEFF = GOB*G
     beta = beta0(pb,mtot,GOB)
-    ecc = injectionsA[paramnamesA.index("ECC")]
+    ecc = pA.prefit["ECC"].val
     omdotA = omega_dot(pb,ecc,m1,m2)
     omdotB = omega_dot(pb,ecc,m2,m1)
     gammaA = gamma(pb,ecc,m1,m2)
@@ -145,16 +145,16 @@ if __name__ == '__main__':
     print "parameter    computed    injected"
     print "m A:",m1
     print "m B:",m2
-    print "a A:",aA,injectionsA[paramnamesA.index("A1")]
-    print "a B:",aB,injectionsB[paramnamesB.index("A1")]
-    print "omdot A:",omdotA,injectionsA[paramnamesA.index("OMDOT")]
-    print "omdot B:",omdotB,injectionsB[paramnamesB.index("OMDOT")]
-    print "pbdot A:",pbdotA,injectionsA[paramnamesA.index("PBDOT")]
-    print "pbdot B:",pbdotB,injectionsB[paramnamesB.index("PBDOT")]
-    print "gamma A:",gammaA,injectionsA[paramnamesA.index("GAMMA")]
-    print "gamma B:",gammaB,injectionsB[paramnamesB.index("GAMMA")]
-    print "s A:",sA,injectionsA[paramnamesA.index("SINI")]
-    print "s B:",sB,injectionsB[paramnamesB.index("SINI")]
+    print "a A:",aA,pA.prefit["A1"].val
+    print "a B:",aB,pB.prefit["A1"].val
+    print "omdot A:",omdotA,pA.prefit["OMDOT"].val
+    print "omdot B:",omdotB,pB.prefit["OMDOT"].val
+    print "pbdot A:",pbdotA,pA.prefit["PBDOT"].val
+    print "pbdot B:",pbdotB,pB.prefit["PBDOT"].val
+    print "gamma A:",gammaA,pA.prefit["GAMMA"].val
+    print "gamma B:",gammaB,pB.prefit["GAMMA"].val
+    print "s A:",sA,pA.prefit["SINI"].val
+    print "s B:",sB,pB.prefit["SINI"].val
     print "Omega SO A:",omegaSO(pb,ecc,m1,m2)
     print "Omega SO B:",omegaSO(pb,ecc,m2,m1)
     print "AG:"
@@ -162,8 +162,8 @@ if __name__ == '__main__':
     si = shapiroSAG(pb,aA,m2/mtot,beta)
     aA = semimaxjoraxis(pb,m1,m2)*si
     aB = semimaxjoraxis(pb,m2,m1)*si
-    print "a A:",aA,injectionsA[paramnamesA.index("A1")]
-    print "a B:",aB,injectionsB[paramnamesB.index("A1")]
+    print "a A:",aA,pA.prefit["A1"].val
+    print "a B:",aB,pB.prefit["A1"].val
     print "beta:",beta
     print "shapiro s(A):",shapiroSAG(pb,aA,m2/mtot,beta)
     print "shapiro s(B):",shapiroSAG(pb,aB,m1/mtot,beta)

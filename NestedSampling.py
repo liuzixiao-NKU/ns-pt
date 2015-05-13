@@ -87,7 +87,7 @@ class NestedSampler(object):
         model to use for the noise
         default: None
     """
-    def __init__(self,parfiles,timfiles,Nlive=1024,maxmcmc=4096,model=None,noise=None,output=None,verbose=True,seed=1,nthreads=None,prior=None):
+    def __init__(self,parfiles,timfiles,Nlive=1024,maxmcmc=4096,model=None,noise=None,output=None,verbose=True,seed=1,nthreads=1,prior=None):
         """
         Initialise all necessary arguments and variables for the algorithm
         """

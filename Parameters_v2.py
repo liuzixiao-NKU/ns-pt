@@ -212,8 +212,8 @@ class Parameter(object):
                             a = np.maximum(0.1,a)
                             b = np.minimum(10.0,b)
                             if self.model=='GR' or self.model=='CG':
-                                a = np.maximum(1.2,a)
-                                b = np.minimum(1.4,b)
+                                a = np.maximum(1.0,a)
+                                b = np.minimum(1.5,b)
                             self.vary[n+'_'+p.name] = 1
                         if n=='GAMMA':
                             a = np.maximum(0.0,a)

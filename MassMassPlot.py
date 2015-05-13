@@ -8,12 +8,12 @@ import libstempo as T
 from dpgmm import *
 from dpgmm_parallel_solver import *
 import multiprocessing as mp
-from scipy.optimize  import newton
+from scipy.optimize  import newton,brentq
 from collections import defaultdict
 from scipy.stats import binned_statistic
 import matplotlib.cm as cm
 
-maxStick=16
+maxStick=2
 
 def FindHeightForLevel(inArr, adLevels):
     # flatten the array
@@ -96,6 +96,15 @@ def chunkplot(x, y, chunksize, ax=None, line_kwargs=None, **kwargs):
     idx = x.argsort()
     x = x[idx]
     y = y[idx]
+    # remove any invalid value
+    idx = xrange(len(x))
+    invalid=[]
+    for i,xi,yi in zip(idx,x,y):
+		if xi > 10.0 or yi > 10.0:
+			invalid.append(i)
+    x = np.delete(x,invalid)
+    y = np.delete(y,invalid)
+    
     # Wrap the array into a 2D array of chunks, truncating the last chunk if
     # chunksize isn't an even divisor of the total size.
     # (This part won't use _any_ additional memory)
@@ -106,8 +115,8 @@ def chunkplot(x, y, chunksize, ax=None, line_kwargs=None, **kwargs):
     # Calculate the max, min, and means of chunksize-element chunks...
 #    max_env = ychunks.max(axis=1)
 #    min_env = ychunks.min(axis=1)
-    max_env = ychunks.std(axis=1)+ychunks.mean(axis=1)
-    min_env = ychunks.mean(axis=1)-ychunks.std(axis=1)
+    max_env = 3.0*ychunks.std(axis=1)+ychunks.mean(axis=1)
+    min_env = ychunks.mean(axis=1)-3.0*ychunks.std(axis=1)
     ycenters = ychunks.mean(axis=1)
     xcenters = xchunks.mean(axis=1)
 
@@ -121,14 +130,17 @@ if __name__=='__main__':
     parser.add_option("-N", type="int", dest="Nlive", help="Number of Live points",default=1000)
     (options, args) = parser.parse_args()
     Nlive = str(options.Nlive)
-    parfiles =["/projects/pulsar_timing/ns-pt/pulsar_a.par","/projects/pulsar_timing/ns-pt/pulsar_b.par"]
-    timfiles =["/projects/pulsar_timing/ns-pt/pulsar_a_zero_noise.simulate","/projects/pulsar_timing/ns-pt/pulsar_b_zero_noise.simulate"]
+    parfiles =["/home/wdp/src/ns-pt/pulsar_a_nongr.par","/home/wdp/src/ns-pt/pulsar_b_nongr.par"]
+    timfiles =["/home/wdp/src/ns-pt/pulsar_a_zero_noise_nongr.simulate","/home/wdp/src/ns-pt/pulsar_b_zero_noise_nongr.simulate"]
     tex_labels=[r"$M[M_\odot]$",r"$M[M_\odot]$",r"$a[lt\cdot s^{-1}]$",r"$a[lt\cdot s^{-1}]$",r"$\gamma[ms]$",r"$\gamma[ms]$",r"$P_b[\mathrm{days}]$",r"$\dot{P}_b[10^{-12}s^{-1}]$",r"$\dot{\omega}[\mathrm{deg}\cdot \mathrm{yr}^{-1}]$",r"$e$",r"$s$"]
     psrA = T.tempopulsar(parfile = parfiles[0], timfile = timfiles[0])
     psrB = T.tempopulsar(parfile = parfiles[1], timfile = timfiles[1])
-    posterior_samples = [genfromtxt( "dbl_psr/Free/posterior_samples.txt",names=True)]
-    posterior_samples.append(genfromtxt( "dbl_psr/CG/posterior_samples.txt",names=True))
-    posterior_samples.append(genfromtxt( "dbl_psr/GR/posterior_samples.txt",names=True))
+    #posterior_samples = [genfromtxt( "dbl_psr/Free/posterior_samples.txt",names=True)]
+    #posterior_samples.append(genfromtxt( "dbl_psr/CG/posterior_samples.txt",names=True))
+    #posterior_samples.append(genfromtxt( "dbl_psr/GR/posterior_samples.txt",names=True))
+    posterior_samples = [genfromtxt( "/home/wdp/src/ns-pt/Free/nonGR/rerun/posterior_samples.txt",names=True)]
+    posterior_samples.append(genfromtxt( "/home/wdp/src/ns-pt/CG/nonGR/rerun/posterior_samples.txt",names=True))
+    posterior_samples.append(genfromtxt( "/home/wdp/src/ns-pt/GR/nonGR/rerun/posterior_samples.txt",names=True))    
     # now do the 2D mass posterior
     myfig = figure()
     ax=axes([0.125,0.2,0.95-0.125,0.95-0.2])
@@ -200,14 +212,15 @@ if __name__=='__main__':
 
     for m1,m2,g1,g2,pb,e,a1,a2,om,pbd,s in zip(posterior_samples[0]["M2_PSRB"],posterior_samples[0]["M2_PSRA"],posterior_samples[0]["GAMMA_PSRA"],posterior_samples[0]["GAMMA_PSRB"],posterior_samples[0]["PB_PSR"],posterior_samples[0]["ECC_PSR"],posterior_samples[0]["A1_PSRA"],posterior_samples[0]["A1_PSRB"],posterior_samples[0]["OMDOT_PSR"],posterior_samples[0]["PBDOT_PSR"],posterior_samples[0]["SINI_PSR"]):
         try:
-            invM2['GAMMA'].append((m1,newton(gamma_m1_wrapper,m2,args=(g1,pb,e,m1))))
-            invM2['OMDOT'].append((m1,newton(omega_dot_wrapper,m2,args=(om,pb,e,m1))))
-            invM2['PBDOT'].append((m1,newton(pb_dot_wrapper,m2,args=(pbd,pb,e,m1))))
-            invM2['SINI'].append((m1,newton(s_wrapper,m2,args=(s,pb,a2,m1))))
-            invM1['GAMMA'].append((m2,newton(gamma_m1_wrapper,m1,args=(g2,pb,e,m2))))
-            invM1['OMDOT'].append((m2,newton(omega_dot_wrapper,m1,args=(om,pb,e,m2))))
-            invM1['PBDOT'].append((m2,newton(pb_dot_wrapper,m1,args=(pbd,pb,e,m2))))
-            invM1['SINI'].append((m2,newton(s_wrapper,m1,args=(s,pb,a1,m2))))
+			if m1<3.0 and m2<3.0:
+				invM2['GAMMA'].append((m1,newton(gamma_m1_wrapper,m2,args=(g1,pb,e,m1),maxiter=1000)))
+				invM2['OMDOT'].append((m1,newton(omega_dot_wrapper,m2,args=(om,pb,e,m1),maxiter=1000)))
+				invM2['PBDOT'].append((m1,newton(pb_dot_wrapper,m2,args=(pbd,pb,e,m1),maxiter=1000)))
+				invM2['SINI'].append((m1,newton(s_wrapper,m2,args=(s,pb,a2,m1),maxiter=1000)))
+				invM1['GAMMA'].append((m2,newton(gamma_m1_wrapper,m1,args=(g2,pb,e,m2),maxiter=1000)))
+				invM1['OMDOT'].append((m2,newton(omega_dot_wrapper,m1,args=(om,pb,e,m2),maxiter=1000)))
+				invM1['PBDOT'].append((m2,newton(pb_dot_wrapper,m1,args=(pbd,pb,e,m2),maxiter=1000)))
+				invM1['SINI'].append((m2,newton(s_wrapper,m1,args=(s,pb,a1,m2),maxiter=1000)))
         except:
             pass
 
@@ -217,10 +230,10 @@ if __name__=='__main__':
 
         invM1[lab] = np.array(invM1[lab])
         invM2[lab] = np.array(invM2[lab])
-        chunkplot(invM1[lab][:,0],invM1[lab][:,1], chunksize=10, ax=ax,edgecolor=mark, alpha=0.5, color=mark, label = lab)
-        chunkplot(invM2[lab][:,1],invM2[lab][:,0], chunksize=10, ax=ax,edgecolor=mark, alpha=0.5, color=mark,label = lab)
-        chunkplot(invM1[lab][:,0],invM1[lab][:,1], chunksize=10, ax=ax_inset,edgecolor=mark, alpha=0.2, color=mark,label = lab)
-        chunkplot(invM2[lab][:,1],invM2[lab][:,0], chunksize=10, ax=ax_inset,edgecolor=mark, alpha=0.2, color=mark,label = lab)
+        chunkplot(invM1[lab][:,0],invM1[lab][:,1], chunksize=5, ax=ax,edgecolor=mark, alpha=0.5, color=mark, label = lab)
+        chunkplot(invM2[lab][:,1],invM2[lab][:,0], chunksize=5, ax=ax,edgecolor=mark, alpha=0.5, color=mark,label = lab)
+        chunkplot(invM1[lab][:,0],invM1[lab][:,1], chunksize=5, ax=ax_inset,edgecolor=mark, alpha=0.2, color=mark,label = lab)
+        chunkplot(invM2[lab][:,1],invM2[lab][:,0], chunksize=5, ax=ax_inset,edgecolor=mark, alpha=0.2, color=mark,label = lab)
 
     ax.axvline(psrB.prefit['M2'].val,color='k',linestyle='dotted',alpha=0.5,linewidth=1.5)
     ax.axhline(psrA.prefit['M2'].val,color='k',linestyle='dotted',alpha=0.5,linewidth=1.5)
@@ -241,4 +254,4 @@ if __name__=='__main__':
     plt.legend(loc=2,fancybox=True,shadow=True)
     ax_inset.set_xlabel(r"$m_A[M_\odot]$",fontsize=16)
     ax_inset.set_ylabel(r"$m_B[M_\odot]$",fontsize=16)
-    myfig.savefig("m1m2.pdf",bbox_inches='tight')
+    myfig.savefig("m1m2_nongr.pdf",bbox_inches='tight')
