@@ -20,6 +20,7 @@ from scipy.stats import multivariate_normal
 import multiprocessing as mp
 from Queue import Queue
 import proposals
+import signal
 
 def autocorr(x):
     """
@@ -154,22 +155,22 @@ class NestedSampler(object):
         else:
             sys.stderr.write("Checkpoint not found, starting anew\n")
             self.new_run=True
-        cov_array = np.zeros((self.dimension,self.Nlive))
-        for j,p in enumerate(self.params):
-          i = 0
-          for n in self.params[0].par_names:
-            if p.vary[n]==1:
-              cov_array[i,j] = p._internalvalues[n]
-              i+=1
-        self.covariance = np.cov(cov_array)
+#        cov_array = np.zeros((self.dimension,self.Nlive))
+#        for j,p in enumerate(self.params):
+#          i = 0
+#          for n in self.params[0].par_names:
+#            if p.vary[n]==1:
+#              cov_array[i,j] = p._internalvalues[n]
+#              i+=1
+#        self.covariance = np.cov(cov_array)
 #        a = fitDPGMM([self.dimension,self.covariance],np.transpose(cov_array))
 #        if a!=None:
 #          self.gmm = GMM(self.dimension,a)
 #        else:
 #          self.gmm = GMM((self.dimension,self.covariance))
-        ev,evec = np.linalg.eigh(self.covariance)
-        self.eigen_values,self.eigen_vectors = ev.real,evec.real
-        self.mvn = multivariate_normal(np.zeros(self.dimension),self.covariance)
+#        ev,evec = np.linalg.eigh(self.covariance)
+#        self.eigen_values,self.eigen_vectors = ev.real,evec.real
+#        self.mvn = multivariate_normal(np.zeros(self.dimension),self.covariance)
         if self.verbose: sys.stderr.write("Dimension --> %d\n"%self.dimension)
         header = open(os.path.join(output,'header.txt'),'w')
         for n in self.active_live.par_names:
@@ -427,7 +428,7 @@ class NestedSampler(object):
                 for n in self.params[0].par_names:
                     livepoints_stack[i][n] = self.params[i]._internalvalues[n]
             resume_out = open(self.checkpoint,"wb")
-            pickle.dump((livepoints_stack,np.random.get_state(),self.iteration),resume_out)
+            pickle.dump((livepoints_stack,np.random.get_state(),self.iteration,self.cache),resume_out)
             sys.stderr.write("Checkpointed %d live points.\n"%self.Nlive)
             resume_out.close()
             return 0
@@ -438,7 +439,7 @@ class NestedSampler(object):
     def loadState(self):
         try:
             resume_in = open(self.checkpoint,"rb")
-            livepoints_stack,RandomState,self.iteration = pickle.load(resume_in)
+            livepoints_stack,RandomState,self.iteration,self.cache = pickle.load(resume_in)
             resume_in.close()
             for i in xrange(self.Nlive):
                 for n in self.params[0].par_names:
@@ -446,7 +447,8 @@ class NestedSampler(object):
                 self.params[i].logPrior()
                 self.params[i].logLikelihood()
             np.random.set_state(RandomState)
-            self.kwargs=proposals._update_kwargs()
+            self.kwargs=proposals._setup_kwargs(self.params,self.Nlive,self.dimension)
+            self.kwargs=proposals._update_kwargs(**self.kwargs)
             sys.stderr.write("Resumed %d live points.\n"%self.Nlive)
             return 0
         except:
