@@ -150,8 +150,10 @@ class NestedSampler(object):
         self.active_live.logPrior()
         if self.loadState()==0:
             sys.stderr.write("Loaded state %s, resuming run\n"%self.checkpoint)
+            self.new_run=False
         else:
             sys.stderr.write("Checkpoint not found, starting anew\n")
+            self.new_run=True
         cov_array = np.zeros((self.dimension,self.Nlive))
         for j,p in enumerate(self.params):
           i = 0
@@ -310,7 +312,7 @@ class NestedSampler(object):
         main nested sampling loop
         """
         logwidth = np.log(1.0 - np.exp(-1.0 / float(self.Nlive)))
-        self.sample_prior()
+        if self.new_run==True: self.sample_prior()
         self.kwargs=proposals._update_kwargs(**self.kwargs)
         self.autocorrelation()
         self.condition = np.inf
@@ -444,6 +446,7 @@ class NestedSampler(object):
                 self.params[i].logPrior()
                 self.params[i].logLikelihood()
             np.random.set_state(RandomState)
+            self.kwargs=proposals._update_kwargs()
             sys.stderr.write("Resumed %d live points.\n"%self.Nlive)
             return 0
         except:
