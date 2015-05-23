@@ -13,7 +13,7 @@ from collections import defaultdict
 from scipy.stats import binned_statistic
 import matplotlib.cm as cm
 
-maxStick=2
+maxStick=16
 
 def FindHeightForLevel(inArr, adLevels):
     # flatten the array
@@ -130,17 +130,17 @@ if __name__=='__main__':
     parser.add_option("-N", type="int", dest="Nlive", help="Number of Live points",default=1000)
     (options, args) = parser.parse_args()
     Nlive = str(options.Nlive)
-    parfiles =["/home/wdp/src/ns-pt/pulsar_a_nongr.par","/home/wdp/src/ns-pt/pulsar_b_nongr.par"]
-    timfiles =["/home/wdp/src/ns-pt/pulsar_a_zero_noise_nongr.simulate","/home/wdp/src/ns-pt/pulsar_b_zero_noise_nongr.simulate"]
+    parfiles =["/projects/pulsar_timing/ns-pt/pulsar_a.par","/projects/pulsar_timing/ns-pt/pulsar_b.par"]
+    timfiles =["/projects/pulsar_timing/ns-pt/pulsar_a_zero_noise.simulate","//projects/pulsar_timing/ns-pt/pulsar_b_zero_noise.simulate"]
     tex_labels=[r"$M[M_\odot]$",r"$M[M_\odot]$",r"$a[lt\cdot s^{-1}]$",r"$a[lt\cdot s^{-1}]$",r"$\gamma[ms]$",r"$\gamma[ms]$",r"$P_b[\mathrm{days}]$",r"$\dot{P}_b[10^{-12}s^{-1}]$",r"$\dot{\omega}[\mathrm{deg}\cdot \mathrm{yr}^{-1}]$",r"$e$",r"$s$"]
     psrA = T.tempopulsar(parfile = parfiles[0], timfile = timfiles[0])
     psrB = T.tempopulsar(parfile = parfiles[1], timfile = timfiles[1])
     #posterior_samples = [genfromtxt( "dbl_psr/Free/posterior_samples.txt",names=True)]
     #posterior_samples.append(genfromtxt( "dbl_psr/CG/posterior_samples.txt",names=True))
     #posterior_samples.append(genfromtxt( "dbl_psr/GR/posterior_samples.txt",names=True))
-    posterior_samples = [genfromtxt( "/home/wdp/src/ns-pt/Free/nonGR/rerun/posterior_samples.txt",names=True)]
-    posterior_samples.append(genfromtxt( "/home/wdp/src/ns-pt/CG/nonGR/rerun/posterior_samples.txt",names=True))
-    posterior_samples.append(genfromtxt( "/home/wdp/src/ns-pt/GR/nonGR/rerun/posterior_samples.txt",names=True))    
+    posterior_samples = [genfromtxt( "dbl_psr/Free/posterior_samples.txt",names=True)]
+    posterior_samples.append(genfromtxt( "dbl_psr/CG/posterior_samples.txt",names=True))
+    posterior_samples.append(genfromtxt( "dbl_psr/GR/posterior_samples.txt",names=True))
     # now do the 2D mass posterior
     myfig = figure()
     ax=axes([0.125,0.2,0.95-0.125,0.95-0.2])
@@ -254,4 +254,4 @@ if __name__=='__main__':
     plt.legend(loc=2,fancybox=True,shadow=True)
     ax_inset.set_xlabel(r"$m_A[M_\odot]$",fontsize=16)
     ax_inset.set_ylabel(r"$m_B[M_\odot]$",fontsize=16)
-    myfig.savefig("m1m2_nongr.pdf",bbox_inches='tight')
+    myfig.savefig("m1m2.pdf",bbox_inches='tight')

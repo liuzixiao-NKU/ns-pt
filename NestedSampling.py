@@ -91,10 +91,9 @@ class NestedSampler(object):
         """
         Initialise all necessary arguments and variables for the algorithm
         """
-        if nthreads == None:
-          self.nthreads = mp.cpu_count()*2
-        else:
-          self.nthreads = np.minimum(nthreads,mp.cpu_count()*2)
+        if nthreads>1:
+            self.nthreads = np.minimum(nthreads,mp.cpu_count())
+            self.pool = mp.Pool(self.nthreads)
         self.prior_sampling = prior
         self.model = model
         self.noise = noise
@@ -165,7 +164,7 @@ class NestedSampler(object):
         if self.verbose: sys.stderr.write("Dimension --> %d\n"%self.dimension)
         header = open(os.path.join(output,'header.txt'),'w')
         for n in self.active_live.par_names:
-          header.write(n+'\t')
+            header.write(n+'\t')
         header.write('logL\n')
         header.close()
     
@@ -510,24 +509,24 @@ def parse_to_list(option, opt, value, parser):
     setattr(parser.values, option.dest, value.split(','))
 
 if __name__ == '__main__':
-  parser = op.OptionParser()
-  parser.add_option("-N", type="int", dest="Nlive", help="Number of Live points",default=1000)
-  parser.add_option("-o", "--output", type="string", dest="output", help="Output folder", default="Free")
-  parser.add_option("-t", "--type", type="string", dest="model", help="Class of model to assume (Free, GR, CG)", default=None)
-  parser.add_option("-s", type="int", dest="seed", help="seed for the chain", default=0)
-  parser.add_option("--verbose", action="store_true", dest="verbose", help="display progress information", default=False)
-  parser.add_option("--maxmcmc", type="int", dest="maxmcmc", help="maximum number of mcmc steps", default=5000)
-  parser.add_option("--nthreads", type="int", dest="nthreads", help="number of parallel threads to spawn", default=None)
-  parser.add_option("--parameters", type="string", dest="parfiles", help="pulsar parameter files", default=None, action='callback',
+    parser = op.OptionParser()
+    parser.add_option("-N", type="int", dest="Nlive", help="Number of Live points",default=1000)
+    parser.add_option("-o", "--output", type="string", dest="output", help="Output folder", default="Free")
+    parser.add_option("-t", "--type", type="string", dest="model", help="Class of model to assume (Free, GR, CG)", default=None)
+    parser.add_option("-s", type="int", dest="seed", help="seed for the chain", default=0)
+    parser.add_option("--verbose", action="store_true", dest="verbose", help="display progress information", default=False)
+    parser.add_option("--maxmcmc", type="int", dest="maxmcmc", help="maximum number of mcmc steps", default=5000)
+    parser.add_option("--nthreads", type="int", dest="nthreads", help="number of parallel threads to spawn", default=None)
+    parser.add_option("--parameters", type="string", dest="parfiles", help="pulsar parameter files", default=None, action='callback',
                     callback=parse_to_list)
-  parser.add_option("--times", type="string", dest="timfiles", help="pulsar time files, they must be ordered as the parameter files", default=None, action='callback',
+    parser.add_option("--times", type="string", dest="timfiles", help="pulsar time files, they must be ordered as the parameter files", default=None, action='callback',
                                       callback=parse_to_list)
-  parser.add_option( "--sample-prior", action="store_true", dest="prior", help="draw samples from the prior", default=False)
-  parser.add_option( "--noise", dest="noise", type="string", help="noise model to assume", default=None)
-  (options, args) = parser.parse_args()
-  if len(options.parfiles)!= len(options.timfiles):
-    sys.stderr.write("Fatal error! The number of par files is different from the number of times!\n")
-    exit(-1)
+    parser.add_option( "--sample-prior", action="store_true", dest="prior", help="draw samples from the prior", default=False)
+    parser.add_option( "--noise", dest="noise", type="string", help="noise model to assume", default=None)
+    (options, args) = parser.parse_args()
+    if len(options.parfiles)!= len(options.timfiles):
+        sys.stderr.write("Fatal error! The number of par files is different from the number of times!\n")
+        exit(-1)
 
-  NS = NestedSampler(options.parfiles,options.timfiles,model=options.model,seed=options.seed,noise=options.noise,Nlive=options.Nlive,maxmcmc=options.maxmcmc,output=options.output,verbose=options.verbose,nthreads=options.nthreads,prior=options.prior)
-  NS.nested_sampling()
+    NS = NestedSampler(options.parfiles,options.timfiles,model=options.model,seed=options.seed,noise=options.noise,Nlive=options.Nlive,maxmcmc=options.maxmcmc,output=options.output,verbose=options.verbose,nthreads=options.nthreads,prior=options.prior)
+    NS.nested_sampling()

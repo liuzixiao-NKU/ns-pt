@@ -506,8 +506,8 @@ if __name__ == '__main__':
 	import matplotlib.pyplot as plt
 	
 	T.data = "/projects/pulsar_timing/nested_sampling/"
-	parfiles =["/projects/pulsar_timing/nested_sampling/pulsar_a.par","/projects/pulsar_timing/nested_sampling/pulsar_b.par","/projects/pulsar_timing/nested_sampling/pulsar_b.par"]
-	timfiles =["/projects/pulsar_timing/nested_sampling/pulsar_a.simulate","/projects/pulsar_timing/nested_sampling/pulsar_b.simulate","/projects/pulsar_timing/nested_sampling/pulsar_b_py.simulate"]
+	parfiles =["/projects/pulsar_timing/ns-pt/pulsar_a.par","/projects/pulsar_timing/ns-pt/pulsar_b.par","/projects/pulsar_timing/ns-pt/pulsar_b.par"]
+	timfiles =["/projects/pulsar_timing/ns-pt/pulsar_a_zero_noise.simulate","/projects/pulsar_timing/ns-pt/pulsar_b.simulate","/projects/pulsar_timing/ns-pt/pulsar_b_zero_noise.simulate"]
 	
 	psrA = tempopulsar(parfile = parfiles[0], timfile = timfiles[0])
 	psrB = tempopulsar(parfile = parfiles[1], timfile = timfiles[1])
@@ -518,7 +518,7 @@ if __name__ == '__main__':
 	param = [None]*N
 	v = []
 	for i in xrange(N):
-		param[i] = Parameter([psrA,psrB],model='Free')
+		param[i] = Parameter([psrA,psrB],model='Free',noise=None)
 		#print param[i].par_names
 		if len(param[i].pulsars['singles'])>0: print 'single',param[i].pulsars['singles'][0].name
 		if len(param[i].pulsars['binaries'])>0: print 'binaries',param[i].pulsars['binaries'][0][0].name,param[i].pulsars['binaries'][0][1].name
@@ -528,7 +528,7 @@ if __name__ == '__main__':
 		param[i].initialise()
 		#    param[i].set_bounds([psrA,psrB])
 		#    param[i].initialise()
-		print param[i].logLikelihood([psrA,psrB])
+		print param[i].logLikelihood()
 		print param[i].values
 		print param[i]._internalvalues
 	
