@@ -19,6 +19,7 @@ from collections import deque
 from scipy.stats import multivariate_normal
 import multiprocessing as mp
 from Queue import Queue
+import proposals
 
 def autocorr(x):
     """
@@ -91,9 +92,11 @@ class NestedSampler(object):
         """
         Initialise all necessary arguments and variables for the algorithm
         """
+        self.nthreads=1
         if nthreads>1:
             self.nthreads = np.minimum(nthreads,mp.cpu_count())
             self.pool = mp.Pool(self.nthreads)
+        
         self.prior_sampling = prior
         self.model = model
         self.noise = noise
@@ -109,7 +112,7 @@ class NestedSampler(object):
         self.Nmcmc = maxmcmc
         self.cache = deque(maxlen=2*maxmcmc)
         self.maxmcmc = maxmcmc
-        self.output,self.evidence_out = self.setup_output(output)
+        self.output,self.evidence_out,self.checkpoint = self.setup_output(output)
         self.pulsars = [tempopulsar(parfile = parfiles[i], timfile = timfiles[i]) for i in xrange(len(parfiles))]
         for p in self.pulsars: p.fit()
         self.samples = []
@@ -125,6 +128,7 @@ class NestedSampler(object):
         self.jumps = 0
         self.thinning = 1
         self.logLinj = computeLogLinj(self.pulsars)
+        self.proposals = proposals.setup_proposals_cycle()
         for n in xrange(self.Nlive):
             while True:
                 if self.verbose: sys.stderr.write("sprinkling --> %.3f %% complete\r"%(100.0*float(n+1)/float(Nlive)))
@@ -144,7 +148,10 @@ class NestedSampler(object):
         self.active_live.set_bounds()
         self.active_live.initialise()
         self.active_live.logPrior()
-        self.acceptance_probability = None
+        if self.loadState()==0:
+            sys.stderr.write("Loaded state %s, resuming run\n"%self.checkpoint)
+        else:
+            sys.stderr.write("Checkpoint not found, starting anew\n")
         cov_array = np.zeros((self.dimension,self.Nlive))
         for j,p in enumerate(self.params):
           i = 0
@@ -167,14 +174,16 @@ class NestedSampler(object):
             header.write(n+'\t')
         header.write('logL\n')
         header.close()
-    
+        self.kwargs=proposals._setup_kwargs(self.params,self.Nlive,self.dimension)
+        self.kwargs=proposals._update_kwargs(**self.kwargs)
+
     def setup_output(self,output):
         """
         Set up the output folder
         """
         os.system("mkdir -p %s"%output)
         outputfile = "chain_"+self.model+"_"+str(self.Nlive)+"_"+str(self.seed)+".txt"
-        return open(os.path.join(output,outputfile),"w"),open(os.path.join(output,outputfile+"_evidence.txt"), "wb" )
+        return open(os.path.join(output,outputfile),"w"),open(os.path.join(output,outputfile+"_evidence.txt"), "wb" ),os.path.join(output,outputfile+"_resume")
 
     def setup_random_seed(self,seed):
         """
@@ -182,18 +191,6 @@ class NestedSampler(object):
         """
         self.seed = seed
         np.random.seed(seed=self.seed)
-
-    def setup_proposals(self):
-        """
-        initialise the proposals cycle
-        """
-        self.proposal_function = [None]*100
-        for i in xrange(100):
-          jump_select = np.random.uniform(0.,1.)
-          if jump_select<0.2: self.proposal_function[i]=self._mvn
-          elif jump_select<0.5: self.proposal_function[i]=self._eigen
-          elif jump_select<0.8: self.proposal_function[i]=self._stretch
-          else: self.proposal_function[i]=self._walk
 
     def _select_live(self):
         """
@@ -203,123 +200,37 @@ class NestedSampler(object):
             j = np.random.randint(self.Nlive)
             if j!= self.worst:
                 return j
-    def _evolve_live(self):
-        """
-        evolve a live point
-        """
-        self.proposal_function[self.jumps%100]()
-    def _mvn(self):
-        """
-        multivariate normal proposal function
-        will be replaced by a gaussian mixture model proposal once it is working
-        """
-        variates = self.mvn.rvs()#self.gmm.sample()#
-        for n in self.active_live.par_names:
-          k = 0
-          if self.active_live.vary[n]==1:
-            self.active_live._internalvalues[n]+=variates[k]
-            k+=1
-        self.acceptance_probability = np.log(np.random.uniform(0.,1.))
-    def _eigen(self):
-        """
-        normal jump along the live points covariance matrix eigen directions
-        """
-        i = np.random.randint(self.dimension)
-        k = 0
-        for n in self.active_live.par_names:
-          if self.active_live.vary[n]==1:
-            jumpsize = np.sqrt(np.abs(self.eigen_values[i]))*np.random.normal(0,1)
-            self.active_live._internalvalues[n]+=jumpsize*self.eigen_vectors[k,i]
-            k+=1
-        self.acceptance_probability = np.log(np.random.uniform(0.,1.))
-    def _update_mvn(self):
-        """
-        update the live points covariance matrix
-        """
-        cov_array = np.zeros((self.dimension,self.Nlive))
-        for j,p in enumerate(self.params):
-            i = 0
-            for n in self.params[0].par_names:
-                if p.vary[n]==1:
-                    cov_array[i,j] = p._internalvalues[n]
-                    i+=1
-        self.covariance = np.cov(cov_array)
-        #        a = fitDPGMM([self.dimension,self.covariance],np.transpose(cov_array))
-        #        if a!=None:
-        #          self.gmm = GMM(self.dimension,a)
-        #        else:
-        #          self.gmm = GMM([self.dimension,self.covariance])
-        ev,evec = np.linalg.eigh(self.covariance)
-        self.eigen_values,self.eigen_vectors = ev.real,evec.real
-        try:
-            self.mvn = multivariate_normal(np.zeros(self.dimension),self.covariance.T)
-        except:
-            pass
 
-    def _walk(self):
-        """
-        ensemble sampler walk move
-        """
-        Nsubset = 3
-        while True:
-          indeces = random.sample(range(self.Nlive),Nsubset)
-          if self.active_index not in indeces: break
-        subset = [self.params[i] for i in indeces]
-        cm = np.zeros(1,dtype={'names':self.active_live.par_names,'formats':self.active_live.par_types})
-        for n in self.active_live.par_names:
-          cm[n] = np.sum([p._internalvalues[n] for p in subset])/Nsubset
-        w = np.zeros(1,dtype={'names':self.active_live.par_names,'formats':self.active_live.par_types})
-        for n in self.active_live.par_names:
-          w[n] = np.sum([np.random.normal(0,1)*(p._internalvalues[n]-cm[n]) for p in subset])
-        for n in self.active_live.par_names:
-          if self.active_live.vary[n]==1: self.active_live._internalvalues[n]+=w[n]
-        self.acceptance_probability = np.log(np.random.uniform(0.,1.))
-    def _stretch(self):
-        """
-        ensemble sampler stretch move
-        """
-        a=0
-        while True:
-            a = np.random.randint(self.Nlive)
-            if a!=self.active_index: break
-        wa = np.copy(self.params[a]._internalvalues[:])
-        u = np.random.uniform(0.0,1.0)
-        x = 2.0*u*np.log(self.scale)-np.log(self.scale)
-        Z = np.exp(x)
-        for n in self.active_live.par_names:
-          if self.active_live.vary[n]==1: self.active_live._internalvalues[n] = wa[n]+Z*(self.active_live._internalvalues[n]-wa[n])
-        if (Z<1.0/self.scale)or(Z>self.scale): self.acceptance_probability = -np.inf
-        else: self.acceptance_probability = np.log(np.random.uniform(0.,1.))-(self.dimension)*np.log(Z)
     def sample_prior(self):
         """
         generate samples from the prior
         """
         first = 1
         for i in xrange(self.Nlive):
-          if self.verbose: sys.stderr.write("sampling the prior --> %.3f %% complete\r"%(100.0*float(i+1)/float(self.Nlive)))
-          self.copy_params(self.params[i],self.active_live)
-          while self.jumps<self.Nmcmc or self.accepted==0 or self.params[i].logL == -np.inf:
-            logP0 = self.active_live.logPrior()
-            self._evolve_live()
-            logP = self.active_live.logPrior()
-            if logP-logP0 > self.acceptance_probability:
-              logLnew = self.active_live.logLikelihood()
-              if logLnew > -np.inf:
-                self.copy_params(self.active_live,self.params[i])
-                self.accepted+=1
-              else:
-                self.copy_params(self.params[i],self.active_live)
-                self.rejected+=1
-            else:
-              self.copy_params(self.params[i],self.active_live)
-              self.rejected+=1
-            self.cache.append(self.params[i]._internalvalues[:])
-            self.jumps+=1
-          if first and len(self.cache)==2*self.maxmcmc:
-            first = 0
-            self.autocorrelation()
-            self._update_mvn()
-          self.jumps = 0
+            if self.verbose: sys.stderr.write("sampling the prior --> %.3f %% complete\r"%(100.0*float(i+1)/float(self.Nlive)))
+            self.copy_params(self.params[i],self.active_live)
+            while self.jumps<self.Nmcmc or self.accepted==0 or self.params[i].logL == -np.inf:
+                logP0 = self.active_live.logPrior()
+                self.active_live,log_acceptance = self.proposals[self.jumps%100].get_sample(self.active_live,**self.kwargs)
+                logP = self.active_live.logPrior()
+                if logP-logP0 > log_acceptance:
+                    logLnew = self.active_live.logLikelihood()
+                    if logLnew > -np.inf:
+                        self.copy_params(self.active_live,self.params[i])
+                        self.accepted+=1
+                    else:
+                        self.copy_params(self.params[i],self.active_live)
+                        self.rejected+=1
+                else:
+                    self.copy_params(self.params[i],self.active_live)
+                    self.rejected+=1
+                self.cache.append(self.params[i]._internalvalues[:])
+                self.jumps+=1
+                if first and len(self.cache)==2*self.maxmcmc:
+                    first = 0
+                    self.autocorrelation()
+                    self.kwargs=proposals._update_kwargs(**self.kwargs)
+        self.jumps = 0
         if self.verbose: sys.stderr.write("\n")
 
     def evolve(self):
@@ -332,9 +243,9 @@ class NestedSampler(object):
         self.copy_params(self.params[self.worst],self.active_live)
         while (self.jumps < self.Nmcmc or self.accepted==0):
           logP0 = self.active_live.logPrior()
-          self._evolve_live()
+          self.active_live,log_acceptance = self.proposals[self.jumps%100].get_sample(self.active_live,**self.kwargs)
           logP = self.active_live.logPrior()
-          if logP-logP0 > self.acceptance_probability:
+          if logP-logP0 > log_acceptance:
             logLnew = self.active_live.logLikelihood()
             if logLnew > self.logLmin:
               self.copy_params(self.active_live,self.params[self.worst])
@@ -345,9 +256,12 @@ class NestedSampler(object):
           else:
             self.copy_params(self.params[self.worst],self.active_live)
             self.rejected+=1
-          self.cache.append(self.active_live._internalvalues[:])
+          self.cache.append(self.params[self.worst]._internalvalues[:])
           self.jumps+=1
           if self.nthreads>1: self.result_queue.put((self.params[self.worst].values,self.params[self.worst]._internalvalues,self.params[self.worst].logP,self.params[self.worst].logL,self.jumps,float(self.accepted)/float(self.rejected+self.accepted)))
+
+    def evolve_one_step(self):
+        return
 
     def copy_params(self,param_in,param_out):
         """
@@ -395,10 +309,9 @@ class NestedSampler(object):
         """
         main nested sampling loop
         """
-        self.setup_proposals()
         logwidth = np.log(1.0 - np.exp(-1.0 / float(self.Nlive)))
         self.sample_prior()
-        self._update_mvn()
+        self.kwargs=proposals._update_kwargs(**self.kwargs)
         self.autocorrelation()
         self.condition = np.inf
         running_jobs = 0
@@ -476,12 +389,15 @@ class NestedSampler(object):
                 if self.params[self.worst].logL > self.logLmin: break
 
             if self.verbose: sys.stderr.write("%d: n:%4d acc:%.3f H: %.2f logL %.5f --> %.5f dZ: %.3f logZ: %.3f logLmax: %.5f logLinj: %.5f cache: %4d processes: %d\n"%(self.iteration,self.jumps,acceptance,self.information,self.logLmin,self.params[self.worst].logL,self.condition,self.logZ,self.logLmax,self.logLinj,len(self.cache),running_jobs))
+            
+            #.RandomState
             running_jobs = 0
             logwidth-=1.0/float(self.Nlive)
             self.iteration+=1
             if self.iteration%(self.Nlive/4)==0:
               self.autocorrelation()
-              self._update_mvn()
+              self.kwargs=proposals._update_kwargs(**self.kwargs)
+              self.saveState()
             if self.condition < self.tolerance: break
         sys.stderr.write("\n")
         # final adjustments
@@ -501,6 +417,39 @@ class NestedSampler(object):
         self.evidence_out.write('%.5f %.5f %.5f\n'%(self.logZ,self.logLmax,self.logLinj))
         self.evidence_out.close()
         return
+
+    def saveState(self):
+        try:
+            livepoints_stack = np.zeros(self.Nlive,dtype={'names':self.params[0].par_names,'formats':self.params[0].par_types})
+            for i in xrange(self.Nlive):
+                for n in self.params[0].par_names:
+                    livepoints_stack[i][n] = self.params[i]._internalvalues[n]
+            resume_out = open(self.checkpoint,"wb")
+            pickle.dump((livepoints_stack,np.random.get_state(),self.iteration),resume_out)
+            sys.stderr.write("Checkpointed %d live points.\n"%self.Nlive)
+            resume_out.close()
+            return 0
+        except:
+            sys.stderr.write("Checkpointing failed!\n")
+            return 1
+
+    def loadState(self):
+        try:
+            resume_in = open(self.checkpoint,"rb")
+            livepoints_stack,RandomState,self.iteration = pickle.load(resume_in)
+            resume_in.close()
+            for i in xrange(self.Nlive):
+                for n in self.params[0].par_names:
+                    self.params[i]._internalvalues[n] = livepoints_stack[i][n]
+                self.params[i].logPrior()
+                self.params[i].logLikelihood()
+            np.random.set_state(RandomState)
+            sys.stderr.write("Resumed %d live points.\n"%self.Nlive)
+            return 0
+        except:
+            sys.stderr.write("Resuming failed!\n")
+            return 1
+
 
 def parse_to_list(option, opt, value, parser):
     """
