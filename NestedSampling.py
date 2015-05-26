@@ -186,7 +186,7 @@ class NestedSampler(object):
         """
         os.system("mkdir -p %s"%output)
         outputfile = "chain_"+self.model+"_"+str(self.Nlive)+"_"+str(self.seed)+".txt"
-        return open(os.path.join(output,outputfile),"w"),open(os.path.join(output,outputfile+"_evidence.txt"), "wb" ),os.path.join(output,outputfile+"_resume")
+        return open(os.path.join(output,outputfile),"a"),open(os.path.join(output,outputfile+"_evidence.txt"), "wb" ),os.path.join(output,outputfile+"_resume")
 
     def setup_random_seed(self,seed):
         """
