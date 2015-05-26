@@ -21,6 +21,7 @@ import multiprocessing as mp
 from Queue import Queue
 import proposals
 import signal
+from Sampler import *
 
 def autocorr(x):
     """
@@ -103,7 +104,7 @@ class NestedSampler(object):
         self.noise = noise
         self.setup_random_seed(seed)
         self.verbose = verbose
-        self.task_queue =  deque(maxlen=self.nthreads)
+        self.task_queue =  mp.JoinableQueue()
         self.result_queue = mp.JoinableQueue()
         self.active_index = None
         self.accepted = 0
@@ -144,7 +145,6 @@ class NestedSampler(object):
           if self.params[0].vary[n]==1:
             self.dimension+=self.params[0].vary[n]
             if self.verbose: sys.stderr.write("%s in [%.15f,%.15f]\n"%(n,self.params[0].bounds[n][0],self.params[0].bounds[n][1]))
-        self.scale = 2.0
         self.active_live = Parameter(self.pulsars,model=self.model,noise=self.noise)
         self.active_live.set_bounds()
         self.active_live.initialise()
@@ -155,22 +155,7 @@ class NestedSampler(object):
         else:
             sys.stderr.write("Checkpoint not found, starting anew\n")
             self.new_run=True
-#        cov_array = np.zeros((self.dimension,self.Nlive))
-#        for j,p in enumerate(self.params):
-#          i = 0
-#          for n in self.params[0].par_names:
-#            if p.vary[n]==1:
-#              cov_array[i,j] = p._internalvalues[n]
-#              i+=1
-#        self.covariance = np.cov(cov_array)
-#        a = fitDPGMM([self.dimension,self.covariance],np.transpose(cov_array))
-#        if a!=None:
-#          self.gmm = GMM(self.dimension,a)
-#        else:
-#          self.gmm = GMM((self.dimension,self.covariance))
-#        ev,evec = np.linalg.eigh(self.covariance)
-#        self.eigen_values,self.eigen_vectors = ev.real,evec.real
-#        self.mvn = multivariate_normal(np.zeros(self.dimension),self.covariance)
+
         if self.verbose: sys.stderr.write("Dimension --> %d\n"%self.dimension)
         header = open(os.path.join(output,'header.txt'),'w')
         for n in self.active_live.par_names:
@@ -179,6 +164,8 @@ class NestedSampler(object):
         header.close()
         self.kwargs=proposals._setup_kwargs(self.params,self.Nlive,self.dimension)
         self.kwargs=proposals._update_kwargs(**self.kwargs)
+        # set up the sampler object
+        self.sampler = Sampler(self.pulsars,self.maxmcmc,model=self.model,noise=self.noise)
 
     def setup_output(self,output):
         """
@@ -236,36 +223,6 @@ class NestedSampler(object):
         self.jumps = 0
         if self.verbose: sys.stderr.write("\n")
 
-    def evolve(self):
-        """
-        mcmc loop to generate the new live point taking nmcmc steps
-        """
-        self.accepted = 0
-        self.rejected = 1
-        self.jumps = 0
-        self.copy_params(self.params[self.worst],self.active_live)
-        while (self.jumps < self.Nmcmc or self.accepted==0):
-          logP0 = self.active_live.logPrior()
-          self.active_live,log_acceptance = self.proposals[self.jumps%100].get_sample(self.active_live,**self.kwargs)
-          logP = self.active_live.logPrior()
-          if logP-logP0 > log_acceptance:
-            logLnew = self.active_live.logLikelihood()
-            if logLnew > self.logLmin:
-              self.copy_params(self.active_live,self.params[self.worst])
-              self.accepted+=1
-            else:
-              self.copy_params(self.params[self.worst],self.active_live)
-              self.rejected+=1
-          else:
-            self.copy_params(self.params[self.worst],self.active_live)
-            self.rejected+=1
-          self.cache.append(self.params[self.worst]._internalvalues[:])
-          self.jumps+=1
-          if self.nthreads>1: self.result_queue.put((self.params[self.worst].values,self.params[self.worst]._internalvalues,self.params[self.worst].logP,self.params[self.worst].logL,self.jumps,float(self.accepted)/float(self.rejected+self.accepted)))
-
-    def evolve_one_step(self):
-        return
-
     def copy_params(self,param_in,param_out):
         """
         helper function to copy live points
@@ -298,7 +255,7 @@ class NestedSampler(object):
         except:
             sys.stderr.write("ACL computation failed!\n")
             self.Nmcmc = self.maxmcmc
-        if self.nthreads>1: self.Nmcmc = self.maxmcmc
+#        if self.nthreads>1: self.Nmcmc = self.maxmcmc
 
     def wrapper_evolve(self,index):
         """
@@ -313,7 +270,21 @@ class NestedSampler(object):
         main nested sampling loop
         """
         logwidth = np.log(1.0 - np.exp(-1.0 / float(self.Nlive)))
-        if self.new_run==True: self.sample_prior()
+        if self.new_run==True:
+            """
+            generate samples from the prior
+            """
+            first = 1
+            for i in xrange(self.Nlive):
+                if self.verbose: sys.stderr.write("sampling the prior --> %.3f %% complete\r"%(100.0*float(i+1)/float(self.Nlive)))
+                acceptance,self.jumps,self.params[i] = self.sampler.MetropolisHastings(self.params[i],-np.inf,self.Nmcmc,self.cache,**self.kwargs)
+                if first and len(self.cache)==2*self.maxmcmc:
+                    first = 0
+                    self.autocorrelation()
+                    self.kwargs=proposals._update_kwargs(**self.kwargs)
+            if self.verbose: sys.stderr.write("\n")
+
+#self.sample_prior()
         self.kwargs=proposals._update_kwargs(**self.kwargs)
         self.autocorrelation()
         self.condition = np.inf
@@ -341,55 +312,63 @@ class NestedSampler(object):
             self.condition = np.logaddexp(self.logZ,self.logLmax-self.iteration/(float(self.Nlive))-self.logZ)
             line = ""
             for n in self.params[self.worst].par_names:
-              line+='%.30e\t'%self.params[self.worst].values[n]
+                line+='%.30e\t'%self.params[self.worst].values[n]
             line+='%30e\n'%self.params[self.worst].logL
             self.output.write(line)
             self.jumps = 0
-
+            
             if self.nthreads==1:
-              while True:
-                self.active_index =self._select_live()
-                self.copy_params(self.params[self.active_index],self.params[self.worst])
-                self.evolve()
-                self.rejected+=1
-                acceptance = float(self.accepted)/float(self.accepted+self.rejected)
-                if self.params[self.worst].logL>self.logLmin: break
-            else:
-              while True:
-                if not(self.result_queue.empty()):
-                  vals,invals,lp,ll,self.jumps,acceptance = self.result_queue.get()
-                  self.params[self.worst].values = np.copy(vals)
-                  self.params[self.worst]._internalvalues = np.copy(invals)
-                  self.params[self.worst].logP = np.copy(lp)
-                  self.params[self.worst].logL = np.copy(ll)
-                else:
-                  running_jobs = 0
-                  for p in self.task_queue:
-                    running_jobs += p.is_alive()
-                  for n in xrange(self.nthreads-running_jobs):
-                    self.active_index = self._select_live()
+                while True:
+                    self.active_index =self._select_live()
                     self.copy_params(self.params[self.active_index],self.params[self.worst])
-                    p = mp.Process(target=self.wrapper_evolve,args=(self.active_index,))
-                    p.daemon = False
-                    p.start()
-                    self.task_queue.append(p)
-  #                self.task_queue.task_done()
-  #
-  ##print self.task_queue.task_done()
-  #                print self.task_queue.get()
-  #                print self.task_queue.task_done()
-                  running_jobs = 0
-                  for p in self.task_queue:
-                    running_jobs += p.is_alive()
-                  #exit()
-                  vals,invals,lp,ll,self.jumps,acceptance = self.result_queue.get()
-                  self.params[self.worst].values = np.copy(vals)
-                  self.params[self.worst]._internalvalues = np.copy(invals)
-                  self.params[self.worst].logP = np.copy(lp)
-                  self.params[self.worst].logL = np.copy(ll)
-                  #self.copy_params(self.result_queue.get(),self.params[self.worst])
-                  self.rejected+=1
-                if self.params[self.worst].logL > self.logLmin: break
+                    acceptance,self.jumps,self.params[self.worst] = self.sampler.MetropolisHastings(self.params[self.worst],self.logLmin,self.Nmcmc,self.cache,**self.kwargs)
+                    self.rejected+=1
+                    print "acc:",acceptance
+                    if self.params[self.worst].logL>self.logLmin: break
+            else:
+                while True:
+#                    jobs = [self._select_live() for _ in xrange(self.nthreads)]
+#                    all_samples = self.pool.map(self.wrapper_evolve,jobs)
+                    jobs = [self._select_live() for _ in xrange(self.nthreads)]
+#                    for job in jobs: self.task_queue.put(job)
+#                    exit()
+                    all_samples = self.pool.map(self.wrapper_evolve,jobs)
+#                    for job in jobs: job.start()
+#                    for job in jobs: job.join()
+                    exit()
+                    vals,invals,lp,ll,self.jumps,acceptance = self.result_queue.get()
+                    self.params[self.worst].values = np.copy(vals)
+                    self.params[self.worst]._internalvalues = np.copy(invals)
+                    self.params[self.worst].logP = np.copy(lp)
+                    self.params[self.worst].logL = np.copy(ll)
+#                    else:
+#                        running_jobs = 0
+                    for p in self.task_queue:
+                        running_jobs += p.is_alive()
+                    for n in xrange(self.nthreads-running_jobs):
+                        self.active_index = self._select_live()
+                        self.copy_params(self.params[self.active_index],self.params[self.worst])
+                        p = mp.Process(target=self.wrapper_evolve,args=(self.active_index,))
+                        p.daemon = False
+                        p.start()
+                        self.task_queue.append(p)
+      #                self.task_queue.task_done()
+      #
+      ##print self.task_queue.task_done()
+      #                print self.task_queue.get()
+      #                print self.task_queue.task_done()
+                    running_jobs = 0
+                    for p in self.task_queue:
+                        running_jobs += p.is_alive()
+                        #exit()
+                    vals,invals,lp,ll,self.jumps,acceptance = self.result_queue.get()
+                    self.params[self.worst].values = np.copy(vals)
+                    self.params[self.worst]._internalvalues = np.copy(invals)
+                    self.params[self.worst].logP = np.copy(lp)
+                    self.params[self.worst].logL = np.copy(ll)
+                    #self.copy_params(self.result_queue.get(),self.params[self.worst])
+                    self.rejected+=1
+                    if self.params[self.worst].logL > self.logLmin: break
 
             if self.verbose: sys.stderr.write("%d: n:%4d acc:%.3f H: %.2f logL %.5f --> %.5f dZ: %.3f logZ: %.3f logLmax: %.5f logLinj: %.5f cache: %4d processes: %d\n"%(self.iteration,self.jumps,acceptance,self.information,self.logLmin,self.params[self.worst].logL,self.condition,self.logZ,self.logLmax,self.logLinj,len(self.cache),running_jobs))
             

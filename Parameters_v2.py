@@ -14,20 +14,20 @@ vary_formats = [np.int,np.int,np.int,np.int,np.int,np.int,np.int,np.int,np.int,n
 width = 5.
 
 def computeLogLinj(pulsars):
-	"""
-	Injection Likelihood function for white uncorrelated gaussian noise
-	"""
-	# fill the pulsars
-	logL=0.0
-	for p in pulsars:
-		for n in p.pars:
-			p[n].val = np.copy(p.prefit[n].val)
-		err = 1.0e3 * p.toaerrs
-		Cdiag = (err)**2
-		Cinv = np.diag(1.0/Cdiag)
-		logCdet = np.sum(np.log(Cdiag))
-		res = 1e9*np.array(p.residuals(updatebats=True,formresiduals=True),dtype=np.float128)
-		logL+= -0.5 * np.dot(res,np.dot(Cinv,res))- 0.5 * logCdet - 0.5 * len(res) * np.log(2.0*np.pi)
+    """
+    Injection Likelihood function for white uncorrelated gaussian noise
+    """
+    # fill the pulsars
+    logL=0.0
+    for p in pulsars:
+        for n in p.pars:
+            p[n].val = np.copy(p.prefit[n].val)
+        err = 1.0e3 * p.toaerrs
+        Cdiag = (err)**2
+        Cinv = np.diag(1.0/Cdiag)
+        logCdet = np.sum(np.log(Cdiag))
+        res = 1e9*np.array(p.residuals(updatebats=True,formresiduals=True),dtype=np.float128)
+        logL+= -0.5 * np.dot(res,np.dot(Cinv,res))- 0.5 * logCdet - 0.5 * len(res) * np.log(2.0*np.pi)
 	return logL
 
 class Parameter(object):
