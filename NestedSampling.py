@@ -297,7 +297,8 @@ class NestedSampler(object):
             first = 1
             for i in xrange(self.Nlive):
                 if self.verbose: sys.stderr.write("sampling the prior --> %.3f %% complete\r"%(100.0*float(i+1)/float(self.Nlive)))
-                acceptance,self.jumps,self.params[i] = self.sampler.MetropolisHastings(self.params[i],-np.inf,self.Nmcmc,self.cache,**self.kwargs)
+                while self.params[i].logP==-np.inf or self.params[i].logL==-np.inf:
+                    acceptance,self.jumps,self.params[i] = self.sampler.MetropolisHastings(self.params[i],-np.inf,self.Nmcmc,self.cache,**self.kwargs)
                 if first and len(self.cache)==2*self.maxmcmc:
                     first = 0
                     self.autocorrelation()
@@ -343,7 +344,6 @@ class NestedSampler(object):
                     self.copy_params(self.params[self.active_index],self.params[self.worst])
                     acceptance,self.jumps,self.params[self.worst] = self.sampler.MetropolisHastings(self.params[self.worst],self.logLmin,self.Nmcmc,self.cache,**self.kwargs)
                     self.rejected+=1
-                    print "acc:",acceptance
                     if self.params[self.worst].logL>self.logLmin: break
             else:
                 while True:
