@@ -23,7 +23,21 @@ import proposals
 import signal
 from Sampler import *
 
-def runFunctionsInParallel(listOf_FuncAndArgLists):
+import copy_reg
+import types
+import multiprocessing
+
+
+def _pickle_method(m):
+    if m.im_self is None:
+        return getattr, (m.im_class, m.im_func.func_name)
+    else:
+        return getattr, (m.im_self, m.im_func.func_name)
+
+copy_reg.pickle(types.MethodType, _pickle_method)
+
+
+def runSamplerInParallel(listOf_FuncAndArgLists):
   """
     Take a list of lists like [function, arg1, arg2, ...]. Run those functions in parallel, wait for them all to finish, and return the list of their return values, in order.
     
@@ -32,12 +46,12 @@ def runFunctionsInParallel(listOf_FuncAndArgLists):
     """
   from multiprocessing import Process, Queue
   
-  def storeOutputFFF(fff,theArgs,que): #add a argument to function for assigning a queue
+  def storeOutputFFF(fff,theArgs,que,**kwargs): #add a argument to function for assigning a queue
     print "MULTIPROCESSING: Launching %s in parallel "%fff.func_name
-    que.put(fff(*theArgs)) #we're putting return value into queue
+    que.put(fff(*theArgs,**kwargs)) #we're putting return value into queue
   
   queues=[Queue() for fff in listOf_FuncAndArgLists] #create a queue object for each function
-  jobs = [Process(target=storeOutputFFF,args=[funcArgs[0],funcArgs[1:],queues[iii]]) for iii,funcArgs in enumerate(listOf_FuncAndArgLists)]
+  jobs = [Process(target=storeOutputFFF,args=[funcArgs[0],funcArgs[1:-1],queues[iii]],kwargs=funcArgs[-1]) for iii,funcArgs in enumerate(listOf_FuncAndArgLists)]
   for job in jobs: job.start() # Launch them all
   #for job in jobs: job.join() # Wait for them all to finish
   # And now, collect all the outputs:
@@ -117,7 +131,6 @@ class NestedSampler(object):
         self.nthreads=1
         if nthreads>1:
             self.nthreads = np.minimum(nthreads,mp.cpu_count())
-            self.pool = mp.Pool(self.nthreads)
         
         self.prior_sampling = prior
         self.model = model
@@ -347,9 +360,13 @@ class NestedSampler(object):
                     if self.params[self.worst].logL>self.logLmin: break
             else:
                 while True:
-                    list_of_jobs = [(self.wrapper_evolve,i) for i in xrange(self.nthreads)]
-                    jobs = [self._select_live() for _ in xrange(self.nthreads)]
-                    all_samples = runFunctionsInParallel(list_of_jobs)
+                    list_of_jobs = []
+                    for i in xrange(self.nthreads):
+                        self.active_index =self._select_live()
+                        self.copy_params(self.params[self.active_index],self.params[self.worst])
+                        list_of_jobs.append([self.sampler.MetropolisHastings,self.params[self.worst],self.logLmin,self.Nmcmc,self.cache,self.kwargs])
+                    all_samples = runSamplerInParallel(list_of_jobs)
+                    print all_samples
 #                    for job in jobs: job.start()
 #                    for job in jobs: job.join()
                     exit()
