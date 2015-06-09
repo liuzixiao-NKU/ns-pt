@@ -8,6 +8,7 @@ import math
 import numpy
 import os
 import cPickle as pickle
+from functools import partial
 
 parser=OptionParser()
 parser.add_option('-N','--Nlive',action='store',type='int',dest='Nlive',default=None,help='Number of live points in each chain loaded',metavar='NUM')
@@ -76,12 +77,11 @@ def nestPar(d,Nlive):
   bigdata=bigdata[sidx]
   return (logZ,H,bigdata,weights)
 
+mapfunc = partial(genfromtxt, invalid_raise=False)
+
 def loaddata(datalist):
-  out = list(map(loadtxt,datalist))
+  out = list(map(mapfunc,datalist))
   Bfiles = list(map(getBfile,datalist))
-  #if not None in Bfiles: # Subtract off the noise evidence
-  #    for (outfile,Bfile) in zip(out,Bfiles):
-  #        outfile[:,-1]-=Bfile[2]
   return out,Bfiles
 
 def getBfile(datname):
@@ -102,6 +102,7 @@ def nest2pos_par(samps,weights):
   wt=weights+samps[:,logLcol]
   maxwt=max(wt)
   posidx=find(wt>maxwt+log(randoms))
+  print posidx
   pos=samps[posidx,:]
   return pos
 
@@ -109,7 +110,7 @@ Nlive=int(opts.Nlive)
 
 data,Bfiles=loaddata(args)
 #for d in data:
-#data[0] = transpose(sort(transpose(data[0]),axis=-1))
+#    data[0] = transpose(sort(transpose(data[0]),axis=-1))
 
 (logZ,H,d_sorted,weights)=nestPar(data,Nlive)
 

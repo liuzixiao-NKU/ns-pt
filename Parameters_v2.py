@@ -11,7 +11,7 @@ par_names = ['RAJ','DECJ','F0_0','F1_0','F0_1','F1_1','DM','PMRA','PMDEC','PX','
 par_formats = [np.float128,np.float128,np.float128,np.float128,np.float128,np.float128,np.float128,np.float128,np.float128,np.float128,np.float128,np.float128,np.float128,np.float128,np.float128,np.float128,np.float128,np.float128,np.float128,np.float128,np.float128,np.float128,np.float128,np.float128,np.float128,np.float128,np.float128,np.float128]
 vary_formats = [np.int,np.int,np.int,np.int,np.int,np.int,np.int,np.int,np.int,np.int,np.int,np.int,np.int,np.int,np.int,np.int,np.int,np.int,np.int,np.int,np.int,np.int,np.int,np.int,np.int,np.int,np.int,np.int]
 
-width = 10.
+width = 5.
 
 def computeLogLinj(pulsars):
 	"""

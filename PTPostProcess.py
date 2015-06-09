@@ -394,11 +394,12 @@ class Posterior:
       equads = self.samples['logEQUAD_'+singles.name]
       for i,tau,sigma,equad in zip(xrange(np.size(self.samples['logL'])),taus,sigmas,equads):
           autocovariance[i,:] = sigma *sigma * np.exp(-0.5*(r/tau)**2)
-          autocovariance[i,0] += equad
+          autocovariance[i,0] += equad*equad
       colors = ['r','b','k','b','r']
       frequency = []
       psds = []
-      for i in xrange(np.size(self.samples['logL'])):
+      for i in xrange(np.size(self.samples['logL'][::100])):
+        print i
         frequency.append(np.fft.rfftfreq(np.size(autocovariance[i,:]),np.diff(r)[0]))
         psds.append(1e-18*(np.fft.rfft(autocovariance[i,:]).real))
       ax.fill_between(frequency[0],np.percentile(psds,97.5,axis=0),np.percentile(psds,2.5,axis=0),facecolor='r',alpha=0.5)

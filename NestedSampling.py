@@ -119,7 +119,7 @@ class NestedSampler(object):
         self.samples = []
         self.params = [None] * Nlive
         self.logZ = np.finfo(np.float128).min
-        self.tolerance = 0.1
+        self.tolerance = 0.01
         self.condition = None
         self.logLmin = None
         self.information = 0.0
