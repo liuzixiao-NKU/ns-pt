@@ -23,6 +23,26 @@ import proposals
 import signal
 from Sampler import *
 
+def runFunctionsInParallel(listOf_FuncAndArgLists):
+  """
+    Take a list of lists like [function, arg1, arg2, ...]. Run those functions in parallel, wait for them all to finish, and return the list of their return values, in order.
+    
+    (This still needs error handling ie to ensure everything returned okay.)
+    
+    """
+  from multiprocessing import Process, Queue
+  
+  def storeOutputFFF(fff,theArgs,que): #add a argument to function for assigning a queue
+    print "MULTIPROCESSING: Launching %s in parallel "%fff.func_name
+    que.put(fff(*theArgs)) #we're putting return value into queue
+  
+  queues=[Queue() for fff in listOf_FuncAndArgLists] #create a queue object for each function
+  jobs = [Process(target=storeOutputFFF,args=[funcArgs[0],funcArgs[1:],queues[iii]]) for iii,funcArgs in enumerate(listOf_FuncAndArgLists)]
+  for job in jobs: job.start() # Launch them all
+  #for job in jobs: job.join() # Wait for them all to finish
+  # And now, collect all the outputs:
+  return([queue.get() for queue in queues])
+
 def autocorr(x):
     """
     Compute autocorrelation by convolution
@@ -191,6 +211,38 @@ class NestedSampler(object):
             if j!= self.worst:
                 return j
 
+    def sample_prior(self):
+        """
+        generate samples from the prior
+        """
+        first = 1
+        for i in xrange(self.Nlive):
+            if self.verbose: sys.stderr.write("sampling the prior --> %.3f %% complete\r"%(100.0*float(i+1)/float(self.Nlive)))
+            self.copy_params(self.params[i],self.active_live)
+            while self.jumps<self.Nmcmc or self.accepted==0 or self.params[i].logL == -np.inf:
+                logP0 = self.active_live.logPrior()
+                self.active_live,log_acceptance = self.proposals[self.jumps%100].get_sample(self.active_live,**self.kwargs)
+                logP = self.active_live.logPrior()
+                if logP-logP0 > log_acceptance:
+                    logLnew = self.active_live.logLikelihood()
+                    if logLnew > -np.inf:
+                        self.copy_params(self.active_live,self.params[i])
+                        self.accepted+=1
+                    else:
+                        self.copy_params(self.params[i],self.active_live)
+                        self.rejected+=1
+                else:
+                    self.copy_params(self.params[i],self.active_live)
+                    self.rejected+=1
+                self.cache.append(self.params[i]._internalvalues[:])
+                self.jumps+=1
+                if first and len(self.cache)==2*self.maxmcmc:
+                    first = 0
+                    self.autocorrelation()
+                    self.kwargs=proposals._update_kwargs(**self.kwargs)
+        self.jumps = 0
+        if self.verbose: sys.stderr.write("\n")
+
     def copy_params(self,param_in,param_out):
         """
         helper function to copy live points
@@ -259,14 +311,14 @@ class NestedSampler(object):
         running_jobs = 0
         # if requested drop the stack of live points after sampling the prior and return
         if self.prior_sampling:
-            for i in xrange(self.Nlive):
-                line = ""
-                for n in self.params[i].par_names:
-                    line+='%.30e\t'%self.params[i].values[n]
-                line+='%30e\n'%self.params[i].logL
+          for i in xrange(self.Nlive):
+            line = ""
+            for n in self.params[i].par_names:
+              line+='%.30e\t'%self.params[i].values[n]
+            line+='%30e\n'%self.params[i].logL
             self.output.write(line)
-            self.output.close()
-            return 0
+          self.output.close()
+          return
 
         while self.condition > self.tolerance:
             logL_array = np.array([p.logL for p in self.params])
@@ -291,15 +343,13 @@ class NestedSampler(object):
                     self.copy_params(self.params[self.active_index],self.params[self.worst])
                     acceptance,self.jumps,self.params[self.worst] = self.sampler.MetropolisHastings(self.params[self.worst],self.logLmin,self.Nmcmc,self.cache,**self.kwargs)
                     self.rejected+=1
+                    print "acc:",acceptance
                     if self.params[self.worst].logL>self.logLmin: break
             else:
                 while True:
-#                    jobs = [self._select_live() for _ in xrange(self.nthreads)]
-#                    all_samples = self.pool.map(self.wrapper_evolve,jobs)
+                    list_of_jobs = [(self.wrapper_evolve,i) for i in xrange(self.nthreads)]
                     jobs = [self._select_live() for _ in xrange(self.nthreads)]
-#                    for job in jobs: self.task_queue.put(job)
-#                    exit()
-                    all_samples = self.pool.map(self.wrapper_evolve,jobs)
+                    all_samples = runFunctionsInParallel(list_of_jobs)
 #                    for job in jobs: job.start()
 #                    for job in jobs: job.join()
                     exit()
@@ -366,20 +416,6 @@ class NestedSampler(object):
         self.evidence_out.write('%.5f %.5f %.5f\n'%(self.logZ,self.logLmax,self.logLinj))
         self.evidence_out.close()
         return
-
-    def consume_sample(self, producer_lock, queue, work_queue):
-        work_queue.put(self.x)
-        while True:
-    #           print 'Got into consumer method, with pid: %s' % os.getpid()
-            producer_lock.acquire()
-            if not(queue.empty()):
-                logL,self.x = queue.get()
-                print '%d got logL = %f x=%f' %(self.nsamples,logL,self.x)
-                self.samples.append([self.x,logL])
-                self.logZ=np.logaddexp(self.logZ,logL)
-                self.nsamples+=1
-            else:
-                work_queue.put(self.x)
 
     def saveState(self):
         try:
