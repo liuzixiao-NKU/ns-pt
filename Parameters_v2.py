@@ -28,7 +28,7 @@ def computeLogLinj(pulsars):
         logCdet = np.sum(np.log(Cdiag))
         res = 1e9*np.array(p.residuals(updatebats=True,formresiduals=True),dtype=np.float128)
         logL+= -0.5 * np.dot(res,np.dot(Cinv,res))- 0.5 * logCdet - 0.5 * len(res) * np.log(2.0*np.pi)
-	return logL
+    return logL
 
 class Parameter(object):
     """
