@@ -7,10 +7,6 @@ import sys
 import george
 from george import kernels
 
-par_names = ['RAJ','DECJ','F0_0','F1_0','F0_1','F1_1','DM','PMRA','PMDEC','PX','SINI','PB','T0','A1_0','A1_1','OM_0','OM_1','ECC','PBDOT','OMDOT','M2_0','M2_1','GAMMA_0','GAMMA_1','GOB','EPS','XI','KAPPA']
-par_formats = [np.float128,np.float128,np.float128,np.float128,np.float128,np.float128,np.float128,np.float128,np.float128,np.float128,np.float128,np.float128,np.float128,np.float128,np.float128,np.float128,np.float128,np.float128,np.float128,np.float128,np.float128,np.float128,np.float128,np.float128,np.float128,np.float128,np.float128,np.float128]
-vary_formats = [np.int,np.int,np.int,np.int,np.int,np.int,np.int,np.int,np.int,np.int,np.int,np.int,np.int,np.int,np.int,np.int,np.int,np.int,np.int,np.int,np.int,np.int,np.int,np.int,np.int,np.int,np.int,np.int]
-
 width = 5.
 
 def computeLogLinj(pulsars):
@@ -277,7 +273,7 @@ class Parameter(object):
 
     def map(self):
         """
-        Maps [0,1] to the bounds of the parameters
+        Maps [-1,1] to the bounds of the parameters
         """
         for name in self.par_names:
             if (self.vary[name]==1):
@@ -285,7 +281,7 @@ class Parameter(object):
 
     def invmap(self):
         """
-        Maps the bounds of the parameters onto [0,1] BROKEN!
+        Maps the bounds of the parameters onto [-1,1]
         """
         for name in self.par_names:
             if (self.vary[name]==1):
@@ -333,11 +329,6 @@ class Parameter(object):
         if self.inbounds():
             self.logP = 0.0
             for n in self.par_names:
-                if 'MC' in n:
-                    for binaries in self.pulsars['binaries']:
-                        m1 = self.values['M2_'+binaries[1].name]
-                        m2 = self.values['M2_'+binaries[0].name]
-                        self.logP+=np.log(m1*m1/self.values[n])
                 if 'PX' in n:
                     self.logP+=-np.log(self.values[n])
                 if 'DM' in n[:2] and 'DM1' not in n and 'DM2' not in n:

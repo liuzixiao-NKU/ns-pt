@@ -264,7 +264,6 @@ class NestedSampler(object):
         self.copy_params(self.params[self.active_index],self.params[self.worst])
         work_queue.put(self.logLmin)
         while self.condition > self.tolerance:
-
             while not(queue.empty()):
                 self.rejected+=1
                 acceptance,jumps,_internalvalues,values,logP,logL = queue.get()
