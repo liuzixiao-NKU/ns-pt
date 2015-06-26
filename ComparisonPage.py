@@ -306,13 +306,13 @@ if __name__=='__main__':
   parser.add_option( "--DPGMM", type="int", dest="dpgmm", help="fit a dpgmm to the posteriors", default="1")
   (options, args) = parser.parse_args()
 
-  pos = ["double_pulsar/whitenoise/free/posterior_samples.txt"]
-  pos.append("double_pulsar/whitenoise/gr/posterior_samples.txt")
-  pos.append("double_pulsar/whitenoise/cg/posterior_samples.txt")
+  pos = ["results/nongr_double_pulsar/free/posterior_samples.txt"]
+  pos.append("results/nongr_double_pulsar/gr/posterior_samples.txt")
+  pos.append("results/nongr_double_pulsar/cg/posterior_samples.txt")
   
-  ev = ["double_pulsar/whitenoise/free/merged_chain.txt_evidence"]
-  ev.append("double_pulsar/whitenoise/gr/merged_chain.txt_evidence")
-  ev.append("double_pulsar/whitenoise/cg/merged_chain.txt_evidence")
+  ev = ["results/nongr_double_pulsar/free/merged_chain.txt_evidence"]
+  ev.append("results/nongr_double_pulsar/gr/merged_chain.txt_evidence")
+  ev.append("results/nongr_double_pulsar/cg/merged_chain.txt_evidence")
   
   psrs = [T.tempopulsar(parfile = par,timfile = tim) for par,tim in zip(options.parfiles,options.timfiles)]
   param = Parameter(psrs,model='Free')

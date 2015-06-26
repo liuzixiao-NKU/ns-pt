@@ -294,7 +294,10 @@ class NestedSampler(object):
                     self.iteration+=1
             if work_queue.empty():
                 work_queue.put(self.logLmin)
-
+        # empty the queue
+        while not(work_queue.empty()): work_queue.get()
+        # put as many None as sampler processes
+        for _ in xrange(NUMBER_OF_PRODUCER_PROCESSES): work_queue.put(None)
         sys.stderr.write("\n")
         # final adjustments
         i = 0
@@ -312,6 +315,7 @@ class NestedSampler(object):
         self.output.close()
         self.evidence_out.write('%.5f %.5f %.5f\n'%(self.logZ,self.logLmax,self.logLinj))
         self.evidence_out.close()
+        sys.stderr.write("process %s, exiting\n"%os.getpid())
         return 0
 
     def saveState(self):

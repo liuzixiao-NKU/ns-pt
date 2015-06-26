@@ -190,6 +190,15 @@ class Parameter(object):
                         b = np.minimum(1000.0,b)
                     if n=='PX':
                         a = np.maximum(0.1,a)
+                        b = np.minimum(1000.,b)
+                    if n=='A1':
+                        a = np.maximum(0.01,a)
+                    if n=='ECC':
+                        a = np.maximum(0.0,a)
+                    if n=='OMDOT':
+                        a = np.maximum(0.0,a)
+                    if n=='PBDOT':
+                        b = np.minimum(0.0,b)
                     if self.model=='GR' or self.model=='CG':
                         if n == 'OMDOT':
                             self.vary[name] = -1
@@ -220,10 +229,10 @@ class Parameter(object):
                                 self.vary[n+'_'+p.name] = -1
             if 'OM_'+binaries[0].name in self.par_names: self.vary['OM_'+binaries[1].name] = -1
             if self.model=='CG':
-                self.bounds['GOB'] = [0.9,1.1]
-                self.bounds['EPS'] = [2.9,3.1]
-                self.bounds['XI'] = [0.9,1.1]
-                self.bounds['KAPPA'] = [-0.1,0.1]
+                self.bounds['GOB'] = [0.95,1.05]
+                self.bounds['EPS'] = [2.95,3.05]
+                self.bounds['XI'] = [0.95,1.05]
+                self.bounds['KAPPA'] = [-0.05,0.05]
                 self.vary['KAPPA'] = 1
                 self.vary['GOB'] = 1
                 self.vary['EPS'] = 1

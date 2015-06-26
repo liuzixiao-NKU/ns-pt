@@ -123,6 +123,8 @@ class Posterior:
         nam,psrname = name.split('_')
         if len(psrname)==3:
             psrname = "PSRA"
+        elif len(psrname)==7:
+            psrname = "FAKEPSRA"
         injection = self.injections[psrname][nam]
     else:
         injection = None
@@ -271,7 +273,12 @@ class Posterior:
       for p in binaries:
         i = np.argsort(p.toas())
         residuals = 1e9*p.residuals(updatebats=True,formresiduals=True)[i]
-        ax.errorbar(p.toas()[i],residuals,yerr=1e3*p.toaerrs[i],fmt='.',label=p.name+" rms = %.3f ns"%np.sqrt(np.mean(residuals**2)));
+        ax.errorbar(p.toas()[i],residuals,yerr=1e3*p.toaerrs[i],fmt='.',label="$"+p.name+"$ $\mathrm{rms} = %.3f ns $"%np.sqrt(np.mean(residuals**2)));
+        p.fit()
+        tempo_residuals = 1e9*p.residuals(updatebats=True,formresiduals=True)[i]
+        full_residuals = residuals
+        full_residuals_errors = (1e3*p.toaerrs[i])
+        plt.errorbar(p.toas()[i],tempo_residuals,yerr=full_residuals_errors,fmt='.',color='r',label="$"+p.name+"$ $\mathrm{rms} = %.3f ns (\mathrm{TEMPO2})$"%np.sqrt(np.mean(tempo_residuals**2)));
 
     for singles in self.pulsars.pulsars['singles']:
       for n in singles.pars:

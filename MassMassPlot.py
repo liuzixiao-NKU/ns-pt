@@ -130,17 +130,17 @@ if __name__=='__main__':
     parser.add_option("-N", type="int", dest="Nlive", help="Number of Live points",default=1000)
     (options, args) = parser.parse_args()
     Nlive = str(options.Nlive)
-    parfiles =["/projects/pulsar_timing/ns-pt/pulsar_a.par","/projects/pulsar_timing/ns-pt/pulsar_b.par"]
-    timfiles =["/projects/pulsar_timing/ns-pt/pulsar_a_zero_noise.simulate","//projects/pulsar_timing/ns-pt/pulsar_b_zero_noise.simulate"]
+    parfiles =["/projects/pulsar_timing/ns-pt/results/nongr_double_pulsar/pulsar_a.par","/projects/pulsar_timing/ns-pt/results/nongr_double_pulsar/pulsar_b.par"]
+    timfiles =["/projects/pulsar_timing/ns-pt/results/nongr_double_pulsar/pulsar_a_zero_noise.simulate","/projects/pulsar_timing/ns-pt/results/nongr_double_pulsar/pulsar_b_zero_noise.simulate"]
     tex_labels=[r"$M[M_\odot]$",r"$M[M_\odot]$",r"$a[lt\cdot s^{-1}]$",r"$a[lt\cdot s^{-1}]$",r"$\gamma[ms]$",r"$\gamma[ms]$",r"$P_b[\mathrm{days}]$",r"$\dot{P}_b[10^{-12}s^{-1}]$",r"$\dot{\omega}[\mathrm{deg}\cdot \mathrm{yr}^{-1}]$",r"$e$",r"$s$"]
     psrA = T.tempopulsar(parfile = parfiles[0], timfile = timfiles[0])
     psrB = T.tempopulsar(parfile = parfiles[1], timfile = timfiles[1])
     #posterior_samples = [genfromtxt( "dbl_psr/Free/posterior_samples.txt",names=True)]
     #posterior_samples.append(genfromtxt( "dbl_psr/CG/posterior_samples.txt",names=True))
     #posterior_samples.append(genfromtxt( "dbl_psr/GR/posterior_samples.txt",names=True))
-    posterior_samples = [genfromtxt( "dbl_psr/Free/posterior_samples.txt",names=True)]
-    posterior_samples.append(genfromtxt( "dbl_psr/CG/posterior_samples.txt",names=True))
-    posterior_samples.append(genfromtxt( "dbl_psr/GR/posterior_samples.txt",names=True))
+    posterior_samples = [genfromtxt( "results/nongr_double_pulsar/free/posterior_samples.txt",names=True)]
+    posterior_samples.append(genfromtxt( "results/nongr_double_pulsar/gr/posterior_samples.txt",names=True))
+    posterior_samples.append(genfromtxt( "results/nongr_double_pulsar/cg/posterior_samples.txt",names=True))
     # now do the 2D mass posterior
     myfig = figure()
     ax=axes([0.125,0.2,0.95-0.125,0.95-0.2])
@@ -224,16 +224,16 @@ if __name__=='__main__':
         except:
             pass
 
-    colors = cm.rainbow(np.linspace(0, 1, 4))
-
+    colors = cm.binary(np.linspace(0, 1, 4))
+#    colors = [None,None,None,None]
     for lab,mark in zip(['GAMMA','OMDOT','PBDOT','SINI'],colors):
 
         invM1[lab] = np.array(invM1[lab])
         invM2[lab] = np.array(invM2[lab])
-        chunkplot(invM1[lab][:,0],invM1[lab][:,1], chunksize=5, ax=ax,edgecolor=mark, alpha=0.5, color=mark, label = lab)
-        chunkplot(invM2[lab][:,1],invM2[lab][:,0], chunksize=5, ax=ax,edgecolor=mark, alpha=0.5, color=mark,label = lab)
-        chunkplot(invM1[lab][:,0],invM1[lab][:,1], chunksize=5, ax=ax_inset,edgecolor=mark, alpha=0.2, color=mark,label = lab)
-        chunkplot(invM2[lab][:,1],invM2[lab][:,0], chunksize=5, ax=ax_inset,edgecolor=mark, alpha=0.2, color=mark,label = lab)
+        chunkplot(invM1[lab][:,0],invM1[lab][:,1], chunksize=8, ax=ax,edgecolor=mark, alpha=0.25, color=mark, label = lab,linestyle="dotted",linewidth=2)
+        chunkplot(invM2[lab][:,1],invM2[lab][:,0], chunksize=8, ax=ax,edgecolor=mark, alpha=0.25, color=mark,label = lab,linestyle="dashed",linewidth=2)
+        chunkplot(invM1[lab][:,0],invM1[lab][:,1], chunksize=8, ax=ax_inset,edgecolor=mark, alpha=0.25, color=mark,label = lab,linestyle="dotted",linewidth=2)
+        chunkplot(invM2[lab][:,1],invM2[lab][:,0], chunksize=8, ax=ax_inset,edgecolor=mark, alpha=0.25, color=mark,label = lab,linestyle="dashed",linewidth=2)
 
     ax.axvline(psrB.prefit['M2'].val,color='k',linestyle='dotted',alpha=0.5,linewidth=1.5)
     ax.axhline(psrA.prefit['M2'].val,color='k',linestyle='dotted',alpha=0.5,linewidth=1.5)
@@ -254,4 +254,4 @@ if __name__=='__main__':
     plt.legend(loc=2,fancybox=True,shadow=True)
     ax_inset.set_xlabel(r"$m_A[M_\odot]$",fontsize=16)
     ax_inset.set_ylabel(r"$m_B[M_\odot]$",fontsize=16)
-    myfig.savefig("m1m2.pdf",bbox_inches='tight')
+    myfig.savefig("results/nongr_double_pulsar/m1m2.pdf",bbox_inches='tight')
