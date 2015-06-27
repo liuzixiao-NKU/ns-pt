@@ -175,8 +175,8 @@ if __name__ == '__main__':
     # fill in the masses
     m1 = np.random.uniform(1.0,1.5)
     m2 = np.random.uniform(1.0,1.5)
-    pulsar_a['M2'] = m1 # this is M1
-    pulsar_b['M2'] = m2 # this is M2
+    pulsar_a['M2'] = m2 # this is M2
+    pulsar_b['M2'] = m1 # this is M1
     # the inclination angle
     inc = np.random.uniform(0.0,np.pi)
     pulsar_a['SINI'] = np.sin(inc)
