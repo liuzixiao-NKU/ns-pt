@@ -18,6 +18,7 @@ from multiprocessing import Process, Lock, Queue
 import proposals
 import signal
 import time
+from multiprocessing.managers import SyncManager
 
 def autocorrelation(x):
 	"""
@@ -77,10 +78,22 @@ class Sampler(object):
         param_out.logL = np.copy(param_in.logL)
         param_out.logP = np.copy(param_in.logP)
 
-    def produce_sample(self, consumer_lock, queue, work_queue, seed):
+    def produce_sample(self, consumer_lock, queue, work_queue, seed, ip, port, authkey):
         self.seed = seed
         np.random.seed(seed=self.seed)
         counter=1
+        
+        class ServerQueueManager(SyncManager):
+            pass
+
+        ServerQueueManager.register('get_job_q')
+        ServerQueueManager.register('get_result_q')
+
+        manager = ServerQueueManager(address=(ip, port), authkey=authkey)
+        manager.connect()
+
+        print 'Client connected to %s:%s' % (ip, port)
+        exit()
         while(1):
             if not(work_queue.empty()):
                 counter += 1

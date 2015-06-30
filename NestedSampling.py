@@ -331,6 +331,7 @@ class NestedSampler(object):
         self.output.close()
         self.evidence_out.write('%.5f %.5f %.5f\n'%(self.logZ,self.logLmax,self.logLinj))
         self.evidence_out.close()
+        manager.shutdown()
         sys.stderr.write("process %s, exiting\n"%os.getpid())
         return 0
 
@@ -408,8 +409,9 @@ if __name__ == '__main__':
     work_queue = Queue()
     port = 5555
     authkey = "12345"
+    ip = "0.0.0.0"
     for i in xrange(0,NUMBER_OF_PRODUCER_PROCESSES):
-        p = Process(target=Evolver.produce_sample, args=(ns_lock, queue, work_queue, options.seed+i, ))
+        p = Process(target=Evolver.produce_sample, args=(ns_lock, queue, work_queue, options.seed+i, ip, port, authkey))
         process_pool.append(p)
     for i in xrange(0,NUMBER_OF_CONSUMER_PROCESSES):
         p = Process(target=NS.consume_sample, args=(sampler_lock, queue, work_queue, port, authkey))
