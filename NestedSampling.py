@@ -22,7 +22,7 @@ from multiprocessing import Process, Lock, Queue
 import proposals
 import signal
 from Sampler import *
-
+from multiprocessing.managers import SyncManager
 import copy_reg
 import types
 
@@ -220,10 +220,26 @@ class NestedSampler(object):
         param_out.logL = np.copy(param_in.logL)
         param_out.logP = np.copy(param_in.logP)
 
-    def consume_sample(self, producer_lock, queue, work_queue):
+    def consume_sample(self, producer_lock, queue, work_queue, port, authkey):
         """
         main nested sampling loop
         """
+
+        # This is based on the examples in the official docs of multiprocessing.
+        # get_{job|result}_q return synchronized proxies for the actual Queue
+        # objects.
+        class JobQueueManager(SyncManager):
+            pass
+
+        JobQueueManager.register('get_job_q', callable=lambda: work_queue)
+        JobQueueManager.register('get_result_q', callable=lambda: queue)
+
+        manager = JobQueueManager(address=('', port), authkey=authkey)
+        manager.start()
+        print 'Server started at port %s' % port
+        manager.connect()
+        exit()
+
         logwidth = np.log(1.0 - np.exp(-1.0 / float(self.Nlive)))
         if self.new_run==True:
             """
@@ -390,11 +406,13 @@ if __name__ == '__main__':
     sampler_lock = Lock()
     queue = Queue()
     work_queue = Queue()
+    port = 5555
+    authkey = "12345"
     for i in xrange(0,NUMBER_OF_PRODUCER_PROCESSES):
         p = Process(target=Evolver.produce_sample, args=(ns_lock, queue, work_queue, options.seed+i, ))
         process_pool.append(p)
     for i in xrange(0,NUMBER_OF_CONSUMER_PROCESSES):
-        p = Process(target=NS.consume_sample, args=(sampler_lock, queue, work_queue,))
+        p = Process(target=NS.consume_sample, args=(sampler_lock, queue, work_queue, port, authkey))
         process_pool.append(p)
     for each in process_pool:
         each.start()
