@@ -85,7 +85,7 @@ class Sampler(object):
             if not(work_queue.empty()):
                 counter += 1
                 logLmin = work_queue.get()
-                if logLmin==None: break
+                if logLmin=='pill': break
                 acceptance,jumps,outParam = self.MetropolisHastings(self.inParam,logLmin,self.Nmcmc,**self.kwargs)
                 if (counter%4==0):
                     j = np.random.randint(self.poolsize)
