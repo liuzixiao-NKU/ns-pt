@@ -63,11 +63,11 @@ class Posterior:
     s = np.std(self.samples[name])
     if (self.pulsars!=None) and (name!='GOB' and name!='XI' and name!='EPS' and name!='KAPPA' and 'TAU' not in name and 'SIGMA' not in name):
       fields = name.split('_')
-      if fields[-1]=='PSR':
+      if fields[-1]=='FAKEPSR':
         injection = self.pulsars.pulsars['binaries'][0][0].prefit[str(fields[0])].val
-      elif fields[-1]=='PSRA':
+      elif fields[-1]=='FAKEPSRA':
         injection = self.pulsars.pulsars['binaries'][0][0].prefit[str(fields[0])].val
-      elif fields[-1]=='PSRB':
+      elif fields[-1]=='FAKEPSRB':
         injection = self.pulsars.pulsars['binaries'][0][1].prefit[str(fields[0])].val
       elif self.pulsars.pulsars['singles']!=None and fields[0]!='logL':
         injection = self.pulsars.pulsars['singles'][0].prefit[str(fields[0])].val
@@ -306,13 +306,13 @@ if __name__=='__main__':
   parser.add_option( "--DPGMM", type="int", dest="dpgmm", help="fit a dpgmm to the posteriors", default="1")
   (options, args) = parser.parse_args()
 
-  pos = ["results/nongr_double_pulsar/free/posterior_samples.txt"]
-  pos.append("results/nongr_double_pulsar/gr/posterior_samples.txt")
-  pos.append("results/nongr_double_pulsar/cg/posterior_samples.txt")
+  pos = ["results/double_pulsar_2/free/posterior_samples.txt"]
+  pos.append("results/double_pulsar_2/gr/posterior_samples.txt")
+  pos.append("results/double_pulsar_2/cg/posterior_samples.txt")
   
-  ev = ["results/nongr_double_pulsar/free/merged_chain.txt_evidence"]
-  ev.append("results/nongr_double_pulsar/gr/merged_chain.txt_evidence")
-  ev.append("results/nongr_double_pulsar/cg/merged_chain.txt_evidence")
+  ev = ["results/double_pulsar_2/free/merged_chain.txt_evidence"]
+  ev.append("results/double_pulsar_2/gr/merged_chain.txt_evidence")
+  ev.append("results/double_pulsar_2/cg/merged_chain.txt_evidence")
   
   psrs = [T.tempopulsar(parfile = par,timfile = tim) for par,tim in zip(options.parfiles,options.timfiles)]
   param = Parameter(psrs,model='Free')

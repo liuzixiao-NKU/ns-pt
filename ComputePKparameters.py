@@ -163,8 +163,8 @@ if __name__ == '__main__':
     parser.add_option("--gob", type="float", dest="gob", help="vslue of the effective gravitational constant to assume", default=1.0)
     (options, args) = parser.parse_args()
     
-    
-    np.random.seed(259)
+    # good seed: 259
+    np.random.seed(71542299)
     pulsar_a,pulsar_b = {}, {}
     pulsar_a['NAME'] = 'FAKEPSRA'
     pulsar_b['NAME'] = 'FAKEPSRB'
@@ -236,10 +236,10 @@ if __name__ == '__main__':
         print p1,pulsar_a[p1]
         print p2,pulsar_b[p2]
     # now save to a par file each of the pulsars:
-    write_to_file("results/double_pulsar_2/pulsar_a_zero_noise.par",pulsar_a,0)
-    write_to_file("results/double_pulsar_2/pulsar_b_zero_noise.par",pulsar_b,0)
-    write_to_file("results/double_pulsar_2/pulsar_a.par",pulsar_a,1)
-    write_to_file("results/double_pulsar_2/pulsar_b.par",pulsar_b,1)
+    write_to_file("results/double_pulsar_3/pulsar_a_zero_noise.par",pulsar_a,0)
+    write_to_file("results/double_pulsar_3/pulsar_b_zero_noise.par",pulsar_b,0)
+    write_to_file("results/double_pulsar_3/pulsar_a.par",pulsar_a,1)
+    write_to_file("results/double_pulsar_3/pulsar_b.par",pulsar_b,1)
     """
     si = 0.96
     m1 = pB.prefit["M2"].val

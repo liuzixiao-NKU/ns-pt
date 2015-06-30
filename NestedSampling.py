@@ -313,7 +313,7 @@ class NestedSampler(object):
         # empty the queue
         while not(work_queue.empty()): work_queue.get()
         # put as many None as sampler processes
-        for _ in xrange(NUMBER_OF_PRODUCER_PROCESSES): work_queue.put(None)
+        for _ in xrange(NUMBER_OF_PRODUCER_PROCESSES): work_queue.put('pill')
         sys.stderr.write("\n")
         # final adjustments
         i = 0
