@@ -19,10 +19,12 @@ from collections import deque
 from scipy.stats import multivariate_normal
 import multiprocessing as mp
 from multiprocessing import Process, Lock, Queue
+from multiprocessing.sharedctypes import Value
 import proposals
 import signal
 from Sampler import *
 from multiprocessing.managers import SyncManager
+from ctypes import c_int, c_double
 import copy_reg
 import types
 
@@ -149,7 +151,6 @@ class NestedSampler(object):
         self.logZ = np.finfo(np.float128).min
         self.tolerance = 0.01
         self.condition = None
-        self.logLmin = None
         self.information = 0.0
         self.worst = 0
         self.logLmax = None
@@ -186,6 +187,8 @@ class NestedSampler(object):
             header.write(n+'\t')
         header.write('logL\n')
         header.close()
+        self.jobID = Value(c_int,0,lock=Lock())
+        self.logLmin = Value(c_double,-np.inf,lock=Lock())
 
     def setup_output(self,output):
         """
@@ -224,7 +227,6 @@ class NestedSampler(object):
         """
         main nested sampling loop
         """
-
         # This is based on the examples in the official docs of multiprocessing.
         # get_{job|result}_q return synchronized proxies for the actual Queue
         # objects.
@@ -239,34 +241,41 @@ class NestedSampler(object):
         print 'Server started at port %s' % port
         manager.connect()
         exit()
-
+        self.nextID = self.jobID.value
+        self.samples_cache = {}
         logwidth = np.log(1.0 - np.exp(-1.0 / float(self.Nlive)))
         if self.new_run==True:
             """
             generate samples from the prior
             """
             for i in xrange(self.Nlive):
+#                work_queue.put((self.jobID,-np.inf))
+#                self.jobID += 1
                 while True:
-                    if (work_queue.empty()):
-                        work_queue.put(-np.inf)
-                    if not(queue.empty()):
-                        acceptance,jumps,_internalvalues,values,logP,logL = queue.get()
-                        self.params[i].values = np.copy(values)
-                        self.params[i]._internalvalues = np.copy(_internalvalues)
-                        self.params[i].logP = np.copy(logP)
-                        self.params[i].logL = np.copy(logL)
-                        if self.params[i].logP!=-np.inf or self.params[i].logL!=-np.inf: break
+#                    if (work_queue.empty()):
+                    while not(self.nextID in self.samples_cache):
+                        ID,acceptance,jumps,_internalvalues,values,logP,logL = queue.get()
+#                        print logL
+                        self.samples_cache[ID] = acceptance,jumps,_internalvalues,values,logP,logL
+                    acceptance,jumps,_internalvalues,values,logP,logL = self.samples_cache.pop(self.nextID)
+#                    print self.nextID,logL
+                    self.nextID +=1
+                    self.params[i].values = np.copy(values)
+                    self.params[i]._internalvalues = np.copy(_internalvalues)
+                    self.params[i].logP = np.copy(logP)
+                    self.params[i].logL = np.copy(logL)
+                    if self.params[i].logP!=-np.inf or self.params[i].logL!=-np.inf: break
                 if self.verbose: sys.stderr.write("sampling the prior --> %.3f %% complete\r"%(100.0*float(i+1)/float(self.Nlive)))
-
             if self.verbose: sys.stderr.write("\n")
+
         while not(work_queue.empty()): work_queue.get()
         self.condition = np.inf
         logL_array = np.array([p.logL for p in self.params])
         self.worst = logL_array.argmin()
-        self.logLmin = np.min(logL_array)
-
+        self.logLmin.value = np.min(logL_array)
+        logLmin = np.float128(self.logLmin.value)
         self.logLmax = np.max(logL_array)
-        logWt = self.logLmin+logwidth;
+        logWt = logLmin+logwidth;
         logZnew = np.logaddexp(self.logZ, logWt)
         self.information = np.exp(logWt - logZnew) * self.params[self.worst].logL + np.exp(self.logZ - logZnew) * (self.information + self.logZ) - logZnew
         self.logZ = logZnew
@@ -278,42 +287,47 @@ class NestedSampler(object):
         self.output.write(line)
         self.active_index =self._select_live()
         self.copy_params(self.params[self.active_index],self.params[self.worst])
-        work_queue.put(self.logLmin)
+#        work_queue.put((self.jobID,self.logLmin))
         while self.condition > self.tolerance:
-            while not(queue.empty()):
-                self.rejected+=1
-                acceptance,jumps,_internalvalues,values,logP,logL = queue.get()
-                self.params[self.worst].values = np.copy(values)
-                self.params[self.worst]._internalvalues = np.copy(_internalvalues)
-                self.params[self.worst].logP = np.copy(logP)
-                self.params[self.worst].logL = np.copy(logL)
-                
-                if self.params[self.worst].logL>self.logLmin:
-                    logL_array = np.array([p.logL for p in self.params])
-                    self.worst = logL_array.argmin()
-                    self.logLmin = np.min(logL_array)
-                    self.logLmax = np.max(logL_array)
-                    logWt = self.logLmin+logwidth;
-                    logZnew = np.logaddexp(self.logZ, logWt)
-                    self.information = np.exp(logWt - logZnew) * self.params[self.worst].logL + np.exp(self.logZ - logZnew) * (self.information + self.logZ) - logZnew
-                    self.logZ = logZnew
-                    self.condition = np.logaddexp(self.logZ,self.logLmax-self.iteration/(float(self.Nlive))-self.logZ)
-                    line = ""
-                    for n in self.params[self.worst].par_names:
-                        line+='%.30e\t'%self.params[self.worst].values[n]
-                    line+='%30e\n'%self.params[self.worst].logL
-                    self.output.write(line)
-                    self.active_index =self._select_live()
-                    self.copy_params(self.params[self.active_index],self.params[self.worst])
-                    if self.verbose: sys.stderr.write("%d: n:%4d acc:%.3f H: %.2f logL %.5f --> %.5f dZ: %.3f logZ: %.3f logLmax: %.5f logLinj: %.5f\n"%(self.iteration,jumps,acceptance,self.information,self.logLmin,self.params[self.worst].logL,self.condition,self.logZ,self.logLmax,self.logLinj))
-                    logwidth-=1.0/float(self.Nlive)
-                    self.iteration+=1
-            if work_queue.empty():
-                work_queue.put(self.logLmin)
+            while not(self.nextID in self.samples_cache):
+                ID,acceptance,jumps,_internalvalues,values,logP,logL = queue.get()
+                self.samples_cache[ID] = acceptance,jumps,_internalvalues,values,logP,logL
+            acceptance,jumps,_internalvalues,values,logP,logL = self.samples_cache.pop(self.nextID)
+            self.rejected+=1
+            self.nextID += 1
+            self.params[self.worst].values = np.copy(values)
+            self.params[self.worst]._internalvalues = np.copy(_internalvalues)
+            self.params[self.worst].logP = np.copy(logP)
+            self.params[self.worst].logL = np.copy(logL)
+            if self.params[self.worst].logL>self.logLmin.value:
+                logL_array = np.array([p.logL for p in self.params])
+                self.worst = logL_array.argmin()
+                self.logLmin.value = np.min(logL_array)
+                logLmin = np.float128(self.logLmin.value)
+                self.logLmax = np.max(logL_array)
+                logWt = logLmin+logwidth;
+                logZnew = np.logaddexp(self.logZ, logWt)
+                self.information = np.exp(logWt - logZnew) * self.params[self.worst].logL + np.exp(self.logZ - logZnew) * (self.information + self.logZ) - logZnew
+                self.logZ = logZnew
+                self.condition = np.logaddexp(self.logZ,self.logLmax-self.iteration/(float(self.Nlive))-self.logZ)
+                line = ""
+                for n in self.params[self.worst].par_names:
+                    line+='%.30e\t'%self.params[self.worst].values[n]
+                line+='%30e\n'%self.params[self.worst].logL
+                self.output.write(line)
+                self.active_index=self._select_live()
+                self.copy_params(self.params[self.active_index],self.params[self.worst])
+                if self.verbose: sys.stderr.write("%d: n:%4d acc:%.3f H: %.2f logL %.5f --> %.5f dZ: %.3f logZ: %.3f logLmax: %.5f logLinj: %.5f\n"%(self.iteration,jumps,acceptance,self.information,logLmin,self.params[self.worst].logL,self.condition,self.logZ,self.logLmax,self.logLinj))
+                logwidth-=1.0/float(self.Nlive)
+                self.iteration+=1
+#            work_queue.put((self.jobID,self.logLmin))
+#            self.jobID += 1
+#            if work_queue.empty():
         # empty the queue
         while not(work_queue.empty()): work_queue.get()
         # put as many None as sampler processes
-        for _ in xrange(NUMBER_OF_PRODUCER_PROCESSES): work_queue.put('pill')
+#        for _ in xrange(NUMBER_OF_PRODUCER_PROCESSES): work_queue.put("pill")
+        self.logLmin.value = np.inf
         sys.stderr.write("\n")
         # final adjustments
         i = 0
@@ -411,7 +425,7 @@ if __name__ == '__main__':
     authkey = "12345"
     ip = "0.0.0.0"
     for i in xrange(0,NUMBER_OF_PRODUCER_PROCESSES):
-        p = Process(target=Evolver.produce_sample, args=(ns_lock, queue, work_queue, options.seed+i, ip, port, authkey))
+        p = Process(target=Evolver.produce_sample, args=(ns_lock, queue, NS.jobID, NS.logLmin, options.seed+i,ip, port, authkey ))
         process_pool.append(p)
     for i in xrange(0,NUMBER_OF_CONSUMER_PROCESSES):
         p = Process(target=NS.consume_sample, args=(sampler_lock, queue, work_queue, port, authkey))

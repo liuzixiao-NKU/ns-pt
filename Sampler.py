@@ -19,6 +19,7 @@ import proposals
 import signal
 import time
 from multiprocessing.managers import SyncManager
+from ctypes import c_int
 
 def autocorrelation(x):
 	"""
@@ -78,7 +79,7 @@ class Sampler(object):
         param_out.logL = np.copy(param_in.logL)
         param_out.logP = np.copy(param_in.logP)
 
-    def produce_sample(self, consumer_lock, queue, work_queue, seed, ip, port, authkey):
+    def produce_sample(self, consumer_lock, queue, IDcounter, logLmin, seed, ip, port, authkey):
         self.seed = seed
         np.random.seed(seed=self.seed)
         counter=1
@@ -95,15 +96,25 @@ class Sampler(object):
         print 'Client connected to %s:%s' % (ip, port)
         exit()
         while(1):
-            if not(work_queue.empty()):
-                counter += 1
-                logLmin = work_queue.get()
-                if logLmin=='pill': break
-                acceptance,jumps,outParam = self.MetropolisHastings(self.inParam,logLmin,self.Nmcmc,**self.kwargs)
-                if (counter%4==0):
-                    j = np.random.randint(self.poolsize)
-                    self.copy_params(outParam,self.evolution_points[j])
-                queue.put((acceptance,jumps,outParam._internalvalues,outParam.values,outParam.logP,outParam.logL))
+            counter += 1
+            IDcounter.get_lock().acquire()
+#            print "after the lock"
+            jobID = IDcounter.get_obj()
+#            print jobID.value
+#            IDcounter.value+=1
+            id = jobID.value
+            jobID.value+=1
+#            print "increased:",jobID.value
+            IDcounter.get_lock().release()
+#            print IDcounter.value
+
+#            jobID,logLmin = work_queue.get()
+            if logLmin.value==np.inf: break
+            acceptance,jumps,outParam = self.MetropolisHastings(self.inParam,logLmin.value,self.Nmcmc,**self.kwargs)
+            if (counter%4==0):
+                j = np.random.randint(self.poolsize)
+                self.copy_params(outParam,self.evolution_points[j])
+            queue.put((id,acceptance,jumps,outParam._internalvalues,outParam.values,outParam.logP,outParam.logL))
 
 #            else:
 #                print 'Work queue looks empty'
