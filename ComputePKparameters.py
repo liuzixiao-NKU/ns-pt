@@ -163,8 +163,10 @@ if __name__ == '__main__':
     parser.add_option("--gob", type="float", dest="gob", help="vslue of the effective gravitational constant to assume", default=1.0)
     (options, args) = parser.parse_args()
     
-    # good seed: 259
-    np.random.seed(71542299)
+    # good seed: 259 71542299 e~1 : 712299, 6666
+    # 4846023 431846023
+    # 899
+    np.random.seed(4096)
     pulsar_a,pulsar_b = {}, {}
     pulsar_a['NAME'] = 'FAKEPSRA'
     pulsar_b['NAME'] = 'FAKEPSRB'
@@ -182,7 +184,7 @@ if __name__ == '__main__':
     pulsar_a['SINI'] = np.sin(inc)
     pulsar_b['SINI'] = np.sin(inc)
     # the eccenticity
-    ecc = np.random.uniform(0.0,1.0)
+    ecc = np.random.uniform(0.0,0.2)
     pulsar_a['ECC'] = ecc
     pulsar_b['ECC'] = ecc
     # the orbital period
@@ -208,10 +210,10 @@ if __name__ == '__main__':
     dec = str(np.random.randint(-90,90))+":"+str(np.random.randint(0,60))+":"+str(np.random.uniform(0.0,60.0))
     pulsar_a['DECJ'] = dec
     pulsar_b['DECJ'] = dec
-    pmra = np.random.uniform(-100.0,100.0)
+    pmra = np.random.uniform(-10.0,10.0)
     pulsar_a['PMRA'] = pmra
     pulsar_b['PMRA'] = pmra
-    pmdec = np.random.uniform(-100.0,100.0)
+    pmdec = np.random.uniform(-10.0,10.0)
     pulsar_a['PMDEC'] = pmdec
     pulsar_b['PMDEC'] = pmdec
     px = np.exp(np.random.uniform(np.log(0.1),np.log(100.0)))
@@ -228,18 +230,18 @@ if __name__ == '__main__':
     f0b = np.random.uniform(0.0,100.0)
     pulsar_a['F0'] = f0a
     pulsar_b['F0'] = f0b
-    f1a = 1e-15*np.random.uniform(0.0,100.0)
-    f1b = 1e-15*np.random.uniform(0.0,100.0)
+    f1a = -1e-15*np.random.uniform(0.0,100.0)
+    f1b = -1e-15*np.random.uniform(0.0,100.0)
     pulsar_a['F1'] = f1a
     pulsar_b['F1'] = f1b
     for p1,p2 in zip(pA.pars,pB.pars):
         print p1,pulsar_a[p1]
         print p2,pulsar_b[p2]
     # now save to a par file each of the pulsars:
-    write_to_file("results/double_pulsar_3/pulsar_a_zero_noise.par",pulsar_a,0)
-    write_to_file("results/double_pulsar_3/pulsar_b_zero_noise.par",pulsar_b,0)
-    write_to_file("results/double_pulsar_3/pulsar_a.par",pulsar_a,1)
-    write_to_file("results/double_pulsar_3/pulsar_b.par",pulsar_b,1)
+    write_to_file("results/double_pulsar_5/pulsar_a_zero_noise.par",pulsar_a,0)
+    write_to_file("results/double_pulsar_5/pulsar_b_zero_noise.par",pulsar_b,0)
+    write_to_file("results/double_pulsar_5/pulsar_a.par",pulsar_a,1)
+    write_to_file("results/double_pulsar_5/pulsar_b.par",pulsar_b,1)
     """
     si = 0.96
     m1 = pB.prefit["M2"].val

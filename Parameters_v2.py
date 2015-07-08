@@ -191,8 +191,6 @@ class Parameter(object):
                     if n=='PX':
                         a = np.maximum(0.1,a)
                         b = np.minimum(1000.,b)
-                    if n=='A1':
-                        a = np.maximum(0.01,a)
                     if n=='ECC':
                         a = np.maximum(0.0,a)
                     if n=='OMDOT':
@@ -222,6 +220,8 @@ class Parameter(object):
                             self.vary[n+'_'+p.name] = 1
                         if n=='GAMMA':
                             a = np.maximum(0.0,a)
+                        if n=='A1':
+                            a = np.maximum(0.01,a)
                         self.bounds[n+'_'+p.name] = [a,b]
                         self.vary[n+'_'+p.name] = p[n].fit
                         if self.model=='GR' or self.model=='CG':

@@ -223,25 +223,11 @@ class NestedSampler(object):
         param_out.logL = np.copy(param_in.logL)
         param_out.logP = np.copy(param_in.logP)
 
-    def consume_sample(self, producer_lock, queue, work_queue, port, authkey):
+    def consume_sample(self, producer_lock, queue, port, authkey):
         """
         main nested sampling loop
         """
-        # This is based on the examples in the official docs of multiprocessing.
-        # get_{job|result}_q return synchronized proxies for the actual Queue
-        # objects.
-        class JobQueueManager(SyncManager):
-            pass
-
-        JobQueueManager.register('get_job_q', callable=lambda: work_queue)
-        JobQueueManager.register('get_result_q', callable=lambda: queue)
-
-        manager = JobQueueManager(address=('', port), authkey=authkey)
-        manager.start()
-        print 'Server started at port %s' % port
-        manager.connect()
-        exit()
-        self.nextID = self.jobID.value
+        self.nextID = 0
         self.samples_cache = {}
         logwidth = np.log(1.0 - np.exp(-1.0 / float(self.Nlive)))
         if self.new_run==True:
@@ -249,16 +235,11 @@ class NestedSampler(object):
             generate samples from the prior
             """
             for i in xrange(self.Nlive):
-#                work_queue.put((self.jobID,-np.inf))
-#                self.jobID += 1
                 while True:
-#                    if (work_queue.empty()):
                     while not(self.nextID in self.samples_cache):
                         ID,acceptance,jumps,_internalvalues,values,logP,logL = queue.get()
-#                        print logL
                         self.samples_cache[ID] = acceptance,jumps,_internalvalues,values,logP,logL
                     acceptance,jumps,_internalvalues,values,logP,logL = self.samples_cache.pop(self.nextID)
-#                    print self.nextID,logL
                     self.nextID +=1
                     self.params[i].values = np.copy(values)
                     self.params[i]._internalvalues = np.copy(_internalvalues)
@@ -268,7 +249,6 @@ class NestedSampler(object):
                 if self.verbose: sys.stderr.write("sampling the prior --> %.3f %% complete\r"%(100.0*float(i+1)/float(self.Nlive)))
             if self.verbose: sys.stderr.write("\n")
 
-        while not(work_queue.empty()): work_queue.get()
         self.condition = np.inf
         logL_array = np.array([p.logL for p in self.params])
         self.worst = logL_array.argmin()
@@ -287,7 +267,6 @@ class NestedSampler(object):
         self.output.write(line)
         self.active_index =self._select_live()
         self.copy_params(self.params[self.active_index],self.params[self.worst])
-#        work_queue.put((self.jobID,self.logLmin))
         while self.condition > self.tolerance:
             while not(self.nextID in self.samples_cache):
                 ID,acceptance,jumps,_internalvalues,values,logP,logL = queue.get()
@@ -317,17 +296,15 @@ class NestedSampler(object):
                 self.output.write(line)
                 self.active_index=self._select_live()
                 self.copy_params(self.params[self.active_index],self.params[self.worst])
-                if self.verbose: sys.stderr.write("%d: n:%4d acc:%.3f H: %.2f logL %.5f --> %.5f dZ: %.3f logZ: %.3f logLmax: %.5f logLinj: %.5f\n"%(self.iteration,jumps,acceptance,self.information,logLmin,self.params[self.worst].logL,self.condition,self.logZ,self.logLmax,self.logLinj))
+                if self.verbose: sys.stderr.write("%d: n:%4d acc:%.3f H: %.2f logL %.5f --> %.5f dZ: %.3f logZ: %.3f logLmax: %.5f logLinj: %.5f cache: %d\n"%(self.iteration,jumps,acceptance,self.information,logLmin,self.params[self.worst].logL,self.condition,self.logZ,self.logLmax,self.logLinj,len(self.samples_cache)))
                 logwidth-=1.0/float(self.Nlive)
                 self.iteration+=1
 #            work_queue.put((self.jobID,self.logLmin))
 #            self.jobID += 1
 #            if work_queue.empty():
-        # empty the queue
-        while not(work_queue.empty()): work_queue.get()
         # put as many None as sampler processes
 #        for _ in xrange(NUMBER_OF_PRODUCER_PROCESSES): work_queue.put("pill")
-        self.logLmin.value = np.inf
+        self.logLmin.value = 999
         sys.stderr.write("\n")
         # final adjustments
         i = 0
@@ -345,7 +322,7 @@ class NestedSampler(object):
         self.output.close()
         self.evidence_out.write('%.5f %.5f %.5f\n'%(self.logZ,self.logLmax,self.logLinj))
         self.evidence_out.close()
-        manager.shutdown()
+#        manager.shutdown()
         sys.stderr.write("process %s, exiting\n"%os.getpid())
         return 0
 
@@ -390,6 +367,48 @@ def parse_to_list(option, opt, value, parser):
     """
     setattr(parser.values, option.dest, value.split(','))
 
+def make_server_manager(port, authkey):
+    """ Create a manager for the server, listening on the given port.
+        Return a manager object with get_job_q and get_result_q methods.
+        """
+
+    results_queue = Queue()
+    
+    # This is based on the examples in the official docs of multiprocessing.
+    # get_{job|result}_q return synchronized proxies for the actual Queue
+    # objects.
+    class JobQueueManager(SyncManager):
+        pass
+    
+    JobQueueManager.register('get_result_q', callable=lambda: results_queue)
+    
+    manager = JobQueueManager(address=('', port), authkey=authkey)
+    manager.start()
+    ns = manager.Namespace()
+    ns.logLmin = -np.inf
+    ns.jobID = 0
+    print 'Server started at port %s' % port
+    return manager,ns
+
+def make_client_manager(ip, port, authkey):
+    """ Create a manager for a client. This manager connects to a server on the
+        given address and exposes the get_job_q and get_result_q methods for
+        accessing the shared queues from the server.
+        Return a manager object.
+    """
+    class ServerQueueManager(SyncManager):
+        pass
+
+    ServerQueueManager.register('get_job_q')
+    ServerQueueManager.register('get_result_q')
+
+    manager = ServerQueueManager(address=(ip, port), authkey=authkey)
+    manager.connect()
+
+    print 'Client connected to %s:%s' % (ip, port)
+    return manager
+
+
 if __name__ == '__main__':
     parser = op.OptionParser()
     parser.add_option("-N", type="int", dest="Nlive", help="Number of Live points",default=1000)
@@ -410,6 +429,14 @@ if __name__ == '__main__':
         sys.stderr.write("Fatal error! The number of par files is different from the number of time files!\n")
         exit(-1)
 
+
+    port = 5555
+    authkey = "12345"
+    ip = "0.0.0.0"
+#    server_manager,namespace = make_server_manager(port, authkey)
+#    client_manager = make_client_manager(ip,port,authkey)
+#    exit()
+
     NS = NestedSampler(options.parfiles,options.timfiles,model=options.model,seed=options.seed,noise=options.noise,Nlive=options.Nlive,maxmcmc=options.maxmcmc,output=options.output,verbose=options.verbose,nthreads=options.nthreads,prior=options.prior)
     Evolver = Sampler(NS.pulsars,options.maxmcmc,model=options.model,noise=options.noise)
 
@@ -420,15 +447,12 @@ if __name__ == '__main__':
     ns_lock = Lock()
     sampler_lock = Lock()
     queue = Queue()
-    work_queue = Queue()
-    port = 5555
-    authkey = "12345"
-    ip = "0.0.0.0"
+    
     for i in xrange(0,NUMBER_OF_PRODUCER_PROCESSES):
         p = Process(target=Evolver.produce_sample, args=(ns_lock, queue, NS.jobID, NS.logLmin, options.seed+i,ip, port, authkey ))
         process_pool.append(p)
     for i in xrange(0,NUMBER_OF_CONSUMER_PROCESSES):
-        p = Process(target=NS.consume_sample, args=(sampler_lock, queue, work_queue, port, authkey))
+        p = Process(target=NS.consume_sample, args=(sampler_lock, queue, port, authkey))
         process_pool.append(p)
     for each in process_pool:
         each.start()

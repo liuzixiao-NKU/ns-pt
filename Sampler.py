@@ -84,44 +84,30 @@ class Sampler(object):
         np.random.seed(seed=self.seed)
         counter=1
         
-        class ServerQueueManager(SyncManager):
-            pass
+#        class ServerQueueManager(SyncManager):
+#            pass
+#
+#        ServerQueueManager.register('get_job_q')
+#        ServerQueueManager.register('get_result_q')
+#
+#        manager = ServerQueueManager(address=(ip, port), authkey=authkey)
+#        manager.connect()
+#
+#        print 'Client connected to %s:%s' % (ip, port)
 
-        ServerQueueManager.register('get_job_q')
-        ServerQueueManager.register('get_result_q')
-
-        manager = ServerQueueManager(address=(ip, port), authkey=authkey)
-        manager.connect()
-
-        print 'Client connected to %s:%s' % (ip, port)
-        exit()
         while(1):
             counter += 1
             IDcounter.get_lock().acquire()
-#            print "after the lock"
             jobID = IDcounter.get_obj()
-#            print jobID.value
-#            IDcounter.value+=1
             id = jobID.value
             jobID.value+=1
-#            print "increased:",jobID.value
             IDcounter.get_lock().release()
-#            print IDcounter.value
-
-#            jobID,logLmin = work_queue.get()
-            if logLmin.value==np.inf: break
+            if logLmin.value==999: break
             acceptance,jumps,outParam = self.MetropolisHastings(self.inParam,logLmin.value,self.Nmcmc,**self.kwargs)
             if (counter%4==0):
                 j = np.random.randint(self.poolsize)
                 self.copy_params(outParam,self.evolution_points[j])
             queue.put((id,acceptance,jumps,outParam._internalvalues,outParam.values,outParam.logP,outParam.logL))
-
-#            else:
-#                print 'Work queue looks empty'
-#            print "consumer lock -->",consumer_lock
-#            consumer_lock.release()
-#            time.sleep(1)
-#            print consumer_lock
             if (counter%(self.poolsize/4))==0 and len(self.cache)==5*self.maxmcmc:
                 counter=1
                 self.autocorrelation()
@@ -169,7 +155,7 @@ class Sampler(object):
             for i,n in enumerate(self.evolution_points[0].par_names):
               if self.evolution_points[0].vary[n]==1:
                 ACF = autocorrelation(cov_array[:,i])
-                ACL = np.min(np.where((ACF > -2./np.sqrt(N)) & (ACF < 2./np.sqrt(N)))[0])#sum(ACF**2)
+                ACL = np.min(np.where((ACF > -2./np.sqrt(N)) & (ACF < 2./np.sqrt(N)))[0])#sum(ACF**2)#
                 if not(np.isnan(ACL)):
                   ACLs.append(ACL)
                   if self.verbose: sys.stderr.write("autocorrelation length %s = %.1f mean = %g standard deviation = %g\n"%(n,ACLs[-1],np.mean(cov_array[:,i]),np.std(cov_array[:,i])))
