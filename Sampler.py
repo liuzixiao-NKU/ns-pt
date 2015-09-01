@@ -39,21 +39,38 @@ class Sampler(object):
         self.model = model
         self.noise = noise
         self.pulsars = pulsars
-        self.param = Parameter(self.pulsars,model=self.model,noise=self.noise)
-        self.param.set_bounds()
-        self.param.initialise()
-        self.param.logPrior()
         self.cache = deque(maxlen=5*maxmcmc)
-        self.inParam = Parameter(self.pulsars,model=self.model,noise=self.noise)
-        self.inParam.set_bounds()
-        self.inParam.initialise()
-        self.inParam.logPrior()
         self.maxmcmc=maxmcmc
         self.Nmcmc=maxmcmc
         self.proposals = proposals.setup_proposals_cycle()
         self.poolsize = 100
         self.evolution_points = [None]*self.poolsize
         self.verbose=verbose
+#        for n in xrange(self.poolsize):
+#            while True:
+#                if self.verbose: sys.stderr.write("process %s --> generating pool of %d points for evolution --> %.3f %% complete\r"%(os.getpid(),self.poolsize,100.0*float(n+1)/float(self.poolsize)))
+#                self.evolution_points[n] = Parameter(self.pulsars,model=self.model,noise=self.noise)
+#                self.evolution_points[n].set_bounds()
+#                self.evolution_points[n].initialise()
+#                self.evolution_points[n].logPrior()
+#                if not(isinf(self.evolution_points[n].logP)): break
+#        if self.verbose: sys.stderr.write("\n")
+#        self.dimension = 0
+#        for n in self.evolution_points[0].par_names:
+#            if self.evolution_points[0].vary[n]==1:
+#                self.dimension+=self.evolution_points[0].vary[n]
+#        self.kwargs = proposals._setup_kwargs(self.evolution_points,self.poolsize,self.dimension)
+#        self.kwargs = proposals._update_kwargs(**self.kwargs)
+
+    def initialise(self):
+        self.inParam = Parameter(self.pulsars,model=self.model,noise=self.noise)
+        self.inParam.set_bounds()
+        self.inParam.initialise()
+        self.inParam.logPrior()
+        self.param = Parameter(self.pulsars,model=self.model,noise=self.noise)
+        self.param.set_bounds()
+        self.param.initialise()
+        self.param.logPrior()
         for n in xrange(self.poolsize):
             while True:
                 if self.verbose: sys.stderr.write("process %s --> generating pool of %d points for evolution --> %.3f %% complete\r"%(os.getpid(),self.poolsize,100.0*float(n+1)/float(self.poolsize)))
@@ -70,6 +87,7 @@ class Sampler(object):
         self.kwargs = proposals._setup_kwargs(self.evolution_points,self.poolsize,self.dimension)
         self.kwargs = proposals._update_kwargs(**self.kwargs)
 
+
     def copy_params(self,param_in,param_out):
         """
         helper function to copy live points
@@ -82,7 +100,8 @@ class Sampler(object):
     def produce_sample(self, consumer_lock, queue, IDcounter, logLmin, seed, ip, port, authkey):
         self.seed = seed
         np.random.seed(seed=self.seed)
-        counter=1
+        self.initialise()
+        self.counter=0
         
 #        class ServerQueueManager(SyncManager):
 #            pass
@@ -96,7 +115,6 @@ class Sampler(object):
 #        print 'Client connected to %s:%s' % (ip, port)
 
         while(1):
-            counter += 1
             IDcounter.get_lock().acquire()
             jobID = IDcounter.get_obj()
             id = jobID.value
@@ -104,14 +122,14 @@ class Sampler(object):
             IDcounter.get_lock().release()
             if logLmin.value==999: break
             acceptance,jumps,outParam = self.MetropolisHastings(self.inParam,logLmin.value,self.Nmcmc,**self.kwargs)
-            if (counter%4==0):
-                j = np.random.randint(self.poolsize)
-                self.copy_params(outParam,self.evolution_points[j])
+#            if (counter%4==0):
+#                j = np.random.randint(self.poolsize)
+#                self.copy_params(outParam,self.evolution_points[j])
             queue.put((id,acceptance,jumps,outParam._internalvalues,outParam.values,outParam.logP,outParam.logL))
-            if (counter%(self.poolsize/4))==0 and len(self.cache)==5*self.maxmcmc:
-                counter=1
+            if (self.counter%(self.poolsize/4))==0:# and len(self.cache)==5*self.maxmcmc
                 self.autocorrelation()
                 self.kwargs=proposals._update_kwargs(**self.kwargs)
+            self.counter += 1
         sys.stderr.write("process %s, exiting\n"%os.getpid())
         return 0
 
@@ -131,6 +149,7 @@ class Sampler(object):
                 logLnew = self.param.logLikelihood()
                 if logLnew > logLmin:
                     self.copy_params(self.param,inParam)
+                    self.copy_params(self.param,self.evolution_points[self.counter%(self.poolsize)])
                     accepted+=1
                 else:
                     self.copy_params(inParam,self.param)

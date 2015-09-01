@@ -193,6 +193,7 @@ class Parameter(object):
                         b = np.minimum(1000.,b)
                     if n=='ECC':
                         a = np.maximum(0.0,a)
+                        b = np.minimum(b,1.0)
                     if n=='OMDOT':
                         a = np.maximum(0.0,a)
                     if n=='PBDOT':

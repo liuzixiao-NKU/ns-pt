@@ -160,13 +160,11 @@ if __name__ == '__main__':
     pA = T.tempopulsar(parfile = "/projects/pulsar_timing/ns-pt/results/double_pulsar_2/pulsar_a.par", timfile = "pulsar_a_zero_noise.simulate")
     pB = T.tempopulsar(parfile = "/projects/pulsar_timing/ns-pt/results/double_pulsar_2/pulsar_b.par", timfile = "pulsar_b_zero_noise.simulate")
     parser = op.OptionParser()
-    parser.add_option("--gob", type="float", dest="gob", help="vslue of the effective gravitational constant to assume", default=1.0)
+    parser.add_option("--gob", type="float", dest="gob", help="value of the effective gravitational constant to assume", default=1.0)
+    parser.add_option("--seed", type="int", dest="seed", help="seed for the rng", default=1)
     (options, args) = parser.parse_args()
     
-    # good seed: 259 71542299 e~1 : 712299, 6666
-    # 4846023 431846023
-    # 899
-    np.random.seed(4096)
+    np.random.seed(options.seed)
     pulsar_a,pulsar_b = {}, {}
     pulsar_a['NAME'] = 'FAKEPSRA'
     pulsar_b['NAME'] = 'FAKEPSRB'
